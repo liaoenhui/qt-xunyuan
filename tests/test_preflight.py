@@ -14,9 +14,11 @@ from qt_tool.web import App
 
 class PreflightTests(unittest.TestCase):
     def test_specs_must_match_in_same_format(self):
-        formats = [dict(vcodec='vp9', width=3840, height=2160, fps=23.976),
+        formats = [dict(vcodec='vp9', width=3840, height=2160, fps=23),
                    dict(vcodec='h264', width=1280, height=720, fps=30)]
         self.assertEqual(format_preflight(formats, 'T7')['status'], 'FAIL')
+        # 23.976（24000/1001）是标准 24p，与规则引擎口径一致，预检不得拦下
+        self.assertEqual(format_preflight([dict(vcodec='vp9', width=3840, height=2160, fps=23.976)], 'T7')['status'], 'PASS')
         self.assertEqual(format_preflight(formats, 'T9')['status'], 'PASS')
         formats.append(dict(vcodec='vp9', width=2560, height=1440, fps=24))
         self.assertEqual(format_preflight(formats, 'T7')['status'], 'PASS')

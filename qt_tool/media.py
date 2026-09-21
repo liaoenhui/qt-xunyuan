@@ -19,7 +19,7 @@ from typing import Any
 
 from .config import Settings
 from .db import Database
-from .rules import RuleEngine, RuleStatus
+from .rules import MINIMUM_LIVE_ACTION_FPS, RuleEngine, RuleStatus
 from .subject import SubjectContinuityAnalyzer
 
 
@@ -41,7 +41,7 @@ def format_preflight(formats: list[dict[str, Any]], bucket: str | None) -> dict[
     width, height = (1920, 1080) if bucket == "T9" else (2560, 1440)
     videos = [f for f in formats if f.get("vcodec") not in (None, "none")]
     def fits(f):
-        return (f.get("width") or 0) >= width and (f.get("height") or 0) >= height and (bucket == "T9" or (f.get("fps") or 0) >= 24)
+        return (f.get("width") or 0) >= width and (f.get("height") or 0) >= height and (bucket == "T9" or (f.get("fps") or 0) >= MINIMUM_LIVE_ACTION_FPS)
     if any(fits(f) for f in videos):
         return {"status": "PASS", "reason": "存在符合分辨率和帧率要求的格式；清晰度、原生画质仍需审核"}
     if not videos or any(not f.get("width") or not f.get("height") or (bucket != "T9" and not f.get("fps")) for f in videos):
