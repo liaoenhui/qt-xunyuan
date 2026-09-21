@@ -6,10 +6,23 @@ from pathlib import Path
 from typing import Any
 
 
-# The first production use-case is a clearly visible human athlete. Applying a
-# person detector to animals, vehicles, hands, or first-person footage would
-# create unsafe cuts, so expansion to other units must use a matching detector.
-SUPPORTED_PERSON_UNITS = frozenset({"T1.1"})
+# Enabled for every unit whose rulebook subject is a clearly visible human.
+# Applying a person detector to animals, vehicles, hands, or first-person
+# footage would create unsafe cuts, so units whose subject may be a pet, a
+# vehicle, a crowd or a natural event stay out: T1.3/T1.6-T1.9 (vehicles),
+# T3.1 (mostly POV hands and pets, and its pass criterion is one unbroken
+# contact arc), T5.1/T5.2/T5.4-T5.6 (vehicles, weather, traffic, scenery),
+# T5.7 (the subject is the crowd or an animal flock, not one person),
+# T6.1-T6.5 (the place is the subject), T8.1-T8.3 (framing or animals).
+# Footage that opens without a prominent person still degrades safely: the
+# analyzer reports LOW_CONFIDENCE and never splits.
+SUPPORTED_PERSON_UNITS = frozenset({
+    "T1.1", "T1.2", "T1.4",
+    "T3.2", "T3.3", "T3.4", "T3.5",
+    "T5.3",
+    "T6.6", "T6.7", "T6.8", "T6.9",
+    "T8.4",
+})
 
 
 @dataclass(frozen=True)
@@ -116,7 +129,7 @@ def select_motion_valley(samples: list[tuple[float, float]]) -> tuple[float, flo
 
 
 class SubjectContinuityAnalyzer:
-    """Conservative prominent-person continuity analysis for T1.1 footage."""
+    """Conservative prominent-person continuity analysis for person-subject units."""
 
     VOC_PERSON_CLASS = 15
 
