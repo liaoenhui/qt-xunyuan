@@ -285,15 +285,32 @@ class SubjectContinuityAnalyzer:
 
         sample_interval = self.sample_interval
         samples: list[tuple[float, float]] = []
-        at = float(start)
         try:
-            while at < end + 0.001:
-                cap.set(cv2.CAP_PROP_POS_MSEC, at * 1000.0)
-                ok, frame = cap.read()
-                if ok:
+            # Decode the range once and skip between samples with grab(), which
+            # stays inside the codec's frame order. Seeking to every sample
+            # instead re-decodes from the preceding keyframe each time and costs
+            # an order of magnitude more on 4K sources. The sampling grid is
+            # snapped to whole frames so the reported times stay exact.
+            fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+            if fps <= 0:
+                return SubjectContinuity(True, False, "UNREADABLE", original,
+                                         evidence={"method": "mobilenet_ssd_prominent_person"})
+            step = max(1, int(round(fps * sample_interval)))
+            sample_interval = step / fps
+            first, last = int(round(start * fps)), int(round(end * fps))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, first)
+            index = first
+            while index < last:
+                if (index - first) % step:
+                    if not cap.grab():
+                        break
+                else:
+                    ok, frame = cap.read()
+                    if not ok or frame is None:
+                        break
                     areas = self._person_area_ratios(frame)
-                    samples.append((round(at, 3), max(areas, default=0.0)))
-                at += sample_interval
+                    samples.append((round(index / fps, 3), max(areas, default=0.0)))
+                index += 1
         finally:
             cap.release()
 

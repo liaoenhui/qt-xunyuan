@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from qt_tool.rules import RuleEngine
 from qt_tool.subject import (SAMPLE_INTERVAL_SECONDS, SUPPORTED_PERSON_UNITS,
@@ -35,6 +36,112 @@ class SupportedUnitTests(unittest.TestCase):
     def test_missing_unit_is_not_supported(self):
         self.assertFalse(SubjectContinuityAnalyzer.supports(None))
         self.assertFalse(SubjectContinuityAnalyzer.supports("T9.9"))
+
+
+CAP_PROP_POS_MSEC = 0
+CAP_PROP_POS_FRAMES = 1
+CAP_PROP_FPS = 5
+
+
+class FakeCapture:
+    """Minimal cv2.VideoCapture stand-in that records how it was driven."""
+
+    def __init__(self, fps: float, frame_count: int, opened: bool = True):
+        self.fps = fps
+        self.frame_count = frame_count
+        self.opened = opened
+        self.position = 0
+        self.property_calls: list[tuple[int, float]] = []
+        self.reads = 0
+        self.grabs = 0
+        self.released = False
+
+    def isOpened(self) -> bool:
+        return self.opened
+
+    def get(self, prop: int) -> float:
+        return float(self.fps) if prop == CAP_PROP_FPS else 0.0
+
+    def set(self, prop: int, value: float) -> bool:
+        self.property_calls.append((prop, value))
+        if prop == CAP_PROP_POS_FRAMES:
+            self.position = int(value)
+        return True
+
+    def grab(self) -> bool:
+        if self.position >= self.frame_count:
+            return False
+        self.position += 1
+        self.grabs += 1
+        return True
+
+    def read(self):
+        if self.position >= self.frame_count:
+            return False, None
+        frame = self.position
+        self.position += 1
+        self.reads += 1
+        return True, frame
+
+    def release(self) -> None:
+        self.released = True
+
+
+class StubAnalyzer(SubjectContinuityAnalyzer):
+    """Analyzer wired to a fake capture and a scripted person detector."""
+
+    def __init__(self, capture: FakeCapture, present_until: float | None = None,
+                 present_from: float | None = None):
+        super().__init__(Path("missing"))
+        self.capture = capture
+        self.present_until = present_until
+        self.present_from = present_from
+        self._cv2 = SimpleNamespace(
+            CAP_PROP_POS_MSEC=CAP_PROP_POS_MSEC,
+            CAP_PROP_POS_FRAMES=CAP_PROP_POS_FRAMES,
+            CAP_PROP_FPS=CAP_PROP_FPS,
+            VideoCapture=lambda _path: capture,
+        )
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    def _person_area_ratios(self, frame) -> list[float]:
+        at = frame / self.capture.fps
+        visible = (self.present_until is None or at <= self.present_until) or \
+                  (self.present_from is not None and at >= self.present_from)
+        return [0.2] if visible else [0.0]
+
+
+class SequentialDecodeTests(unittest.TestCase):
+    def test_samples_are_read_sequentially_without_timestamp_seeks(self):
+        capture = FakeCapture(fps=24, frame_count=480)
+        analyzer = StubAnalyzer(capture)
+        result = analyzer.analyze(Path("clip.mp4"), 0.0, 20.0, "T1.1")
+
+        self.assertEqual(result.status, "PASS")
+        self.assertEqual([prop for prop, _ in capture.property_calls], [CAP_PROP_POS_FRAMES])
+        self.assertEqual(capture.property_calls[0], (CAP_PROP_POS_FRAMES, 0))
+        # One decoded frame per sample, the other five frames only grabbed.
+        self.assertEqual(capture.reads, 80)
+        self.assertEqual(capture.grabs, 400)
+        self.assertTrue(capture.released)
+
+    def test_reported_sample_grid_matches_the_requested_interval(self):
+        capture = FakeCapture(fps=24, frame_count=480)
+        analyzer = StubAnalyzer(capture)
+        result = analyzer.analyze(Path("clip.mp4"), 0.0, 20.0, "T1.1")
+        evidence = result.evidence or {}
+        self.assertAlmostEqual(evidence["sample_interval"], 0.25)
+        self.assertEqual(evidence["sample_count"], 80)
+
+    def test_unknown_frame_rate_is_reported_as_unreadable(self):
+        capture = FakeCapture(fps=0, frame_count=480)
+        analyzer = StubAnalyzer(capture)
+        result = analyzer.analyze(Path("clip.mp4"), 0.0, 20.0, "T1.1")
+        self.assertEqual(result.status, "UNREADABLE")
+        self.assertTrue(capture.released)
 
 
 class SustainedLossThresholdTests(unittest.TestCase):
