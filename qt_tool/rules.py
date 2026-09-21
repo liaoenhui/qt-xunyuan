@@ -143,6 +143,11 @@ class RuleEngine:
             # This is a useful visual pre-filter, but remains non-deterministic:
             # the reviewer still confirms identity and semantic relevance.
             return RuleResult("R11", RuleStatus.PASS, reason, evidence, False)
+        if check == "NO_SEGMENT":
+            # Same non-deterministic UNKNOWN as any other unconfirmed subject,
+            # only with the finding spelled out for the reviewer.
+            return RuleResult("R11", RuleStatus.UNKNOWN,
+                              "主体离场但无 ≥5s 子段，保留整段待人工", evidence, False)
         if check == "SKIPPED_SHOT_CHANGE":
             return RuleResult("R11", RuleStatus.UNKNOWN, "R1 检出镜头切换，主体检测未执行", evidence, False)
         if facts.get("subject_trim_required"):

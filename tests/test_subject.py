@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from qt_tool.rules import RuleEngine
-from qt_tool.subject import (SAMPLE_INTERVAL_SECONDS, SUPPORTED_PERSON_UNITS,
+from qt_tool.rules import RuleEngine, RuleStatus
+from qt_tool.subject import (NO_SEGMENT_NOTE, SAMPLE_INTERVAL_SECONDS, SUPPORTED_PERSON_UNITS,
                              SUSTAINED_LOSS_SECONDS, SubjectContinuityAnalyzer,
                              split_presence_samples)
 
@@ -143,6 +143,47 @@ class SequentialDecodeTests(unittest.TestCase):
         result = analyzer.analyze(Path("clip.mp4"), 0.0, 20.0, "T1.1")
         self.assertEqual(result.status, "UNREADABLE")
         self.assertTrue(capture.released)
+
+
+class NoUsableSegmentTests(unittest.TestCase):
+    def test_sustained_loss_without_a_usable_side_keeps_the_whole_range(self):
+        capture = FakeCapture(fps=24, frame_count=336)
+        analyzer = StubAnalyzer(capture, present_until=4.0)
+        result = analyzer.analyze(Path("clip.mp4"), 0.0, 14.0, "T1.1")
+
+        self.assertEqual(result.status, "NO_SEGMENT")
+        self.assertTrue(result.reliable)
+        self.assertEqual(result.segments, ((0.0, 14.0),))
+        self.assertEqual(len(result.gaps), 1)
+
+        facts = result.facts_for(result.segments[0])
+        self.assertEqual(facts["subject_check"], "NO_SEGMENT")
+        self.assertEqual(facts["subject_note"], NO_SEGMENT_NOTE)
+        self.assertFalse(facts["subject_split_applied"])
+        self.assertTrue(facts["subject_loss_intervals"])
+
+    def test_a_usable_side_is_still_reported_as_a_split(self):
+        capture = FakeCapture(fps=24, frame_count=480)
+        analyzer = StubAnalyzer(capture, present_until=6.0, present_from=11.0)
+        result = analyzer.analyze(Path("clip.mp4"), 0.0, 20.0, "T1.1")
+
+        self.assertEqual(result.status, "SPLIT")
+        self.assertEqual(result.segments, ((0.0, 6.125), (11.0, 20.0)))
+        facts = result.facts_for(result.segments[0])
+        self.assertEqual(facts["subject_check"], "PASS")
+        self.assertEqual(facts["subject_note"], "")
+        self.assertTrue(facts["subject_split_applied"])
+
+    def test_no_segment_is_an_unknown_not_a_rejection(self):
+        engine = RuleEngine(ROOT / "rules" / "qt_rules_v4.yaml", ROOT / "rules" / "conflicts.yaml")
+        facts = {"duration": 14.0, "width": 3840, "height": 2160, "fps": 24, "has_audio": True,
+                 "silence_ratio": 0.0, "playable": True, "shot_count": 1, "video_codec": "h264",
+                 "subject_check": "NO_SEGMENT", "subject_note": NO_SEGMENT_NOTE,
+                 "subject_loss_intervals": [{"start": 4.125, "end": 14.0, "duration": 9.875}]}
+        result = next(r for r in engine.evaluate(facts) if r.rule_id == "R11")
+        self.assertEqual(result.status, RuleStatus.UNKNOWN)
+        self.assertIn("待人工", result.reason)
+        self.assertFalse(engine.automatic_reject([result]))
 
 
 class ModelLoadingTests(unittest.TestCase):

@@ -32,6 +32,10 @@ SUPPORTED_PERSON_UNITS = frozenset({
 SAMPLE_INTERVAL_SECONDS = 0.25
 SUSTAINED_LOSS_SECONDS = 3.5
 
+# Reported when the subject leaves for good but nothing that remains reaches the
+# 5s delivery minimum. The whole range is kept for a human instead of dropped.
+NO_SEGMENT_NOTE = "主体离场但无 ≥5s 子段，保留整段待人工"
+
 
 @dataclass(frozen=True)
 class SubjectContinuity:
@@ -48,7 +52,8 @@ class SubjectContinuity:
         key = f"{segment[0]:.3f}:{segment[1]:.3f}"
         advice = dict((self.boundary_advice or {}).get(key, {}))
         return {
-            "subject_check": "PASS" if self.reliable else "UNKNOWN",
+            "subject_check": ("NO_SEGMENT" if self.status == "NO_SEGMENT" else "PASS") if self.reliable else "UNKNOWN",
+            "subject_note": NO_SEGMENT_NOTE if self.status == "NO_SEGMENT" else "",
             "subject_detector": evidence.get("method"),
             "subject_split_applied": self.status == "SPLIT",
             "subject_segment_start": round(segment[0], 3),
@@ -346,6 +351,12 @@ class SubjectContinuityAnalyzer:
 
         segments, gaps = split_presence_samples(start, end, present, sample_interval=sample_interval,
                                                 minimum_loss=self.minimum_loss)
-        status = "SPLIT" if len(segments) > 1 or segments != original else "PASS"
         boundary_advice = self._boundary_advice(path, segments, gaps)
+        if gaps and segments == original:
+            # The subject was lost for good, but every remaining visible stretch
+            # is shorter than the 5s delivery minimum, so there is nothing to cut
+            # to. Hand the whole range to a reviewer rather than reporting a
+            # clean pass and losing the finding.
+            return SubjectContinuity(True, True, "NO_SEGMENT", original, gaps, evidence, boundary_advice)
+        status = "SPLIT" if len(segments) > 1 or segments != original else "PASS"
         return SubjectContinuity(True, True, status, segments, gaps, evidence, boundary_advice)
