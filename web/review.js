@@ -98,7 +98,9 @@ async function show() {
     }
   };
   $('#source-meta').innerHTML = `<a href="${esc(current.source_url)}" target="_blank" rel="noreferrer">${esc(current.source_title || current.source_url)}</a>`;
-  $('#clip-time').textContent = `${current.start_time.toFixed(2)}s → ${current.end_time.toFixed(2)}s · ${current.duration.toFixed(2)}s`;
+  const splitNote = current.facts?.split_note;
+  $('#clip-time').textContent = `${current.start_time.toFixed(2)}s → ${current.end_time.toFixed(2)}s · ${current.duration.toFixed(2)}s`
+    + (splitNote ? ` · ${splitNote}` : '');
   $('#candidate-title').textContent = `候选判断 · #${current.id}`;
   const globalPosition = (reviewPage - 1) * REVIEW_PAGE_SIZE + index + 1;
   $('#queue-meta').textContent = `#${current.id} · ${globalPosition} / ${reviewTotal} · 本页 ${index + 1} / ${queue.length} · 分数 ${Number(current.score).toFixed(0)}`;

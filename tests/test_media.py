@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import sys
 import tempfile
 import unittest
@@ -11,7 +12,7 @@ from qt_tool.db import Database
 from qt_tool.media import (DownloadStalled, MediaPipeline, _run_download,
                            delivery_description, merge_facts,
                            source_duration_allowed, source_live_reason,
-                           ytdlp_error_message)
+                           split_long_segment, ytdlp_error_message)
 from qt_tool.subject import select_motion_valley, split_presence_samples
 
 
@@ -174,6 +175,63 @@ class MediaTests(unittest.TestCase):
             self.assertTrue(expected.is_file())
             self.assertFalse(legacy_path.exists())
             self.assertEqual(migrated.delivery_rows()[0]["final_path"], str(expected))
+
+    def test_segments_within_the_long_bucket_are_left_untouched(self):
+        self.assertEqual(split_long_segment(0.0, 59.0), [(0.0, 59.0)])
+        self.assertEqual(split_long_segment(12.5, 72.5), [(12.5, 72.5)])
+        self.assertEqual(split_long_segment(0.0, 8.0), [(0.0, 8.0)])
+
+    def test_61_seconds_becomes_two_deliverable_parts(self):
+        parts = split_long_segment(0.0, 61.0)
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(parts[0][0], 0.0)
+        self.assertEqual(parts[-1][1], 61.0)
+        for start, end in parts:
+            self.assertTrue(30.0 <= end - start <= 60.0, parts)
+
+    def test_five_minute_shot_is_split_into_contiguous_30_to_60s_parts(self):
+        parts = split_long_segment(5.0, 305.0)
+        self.assertGreater(len(parts), 1)
+        self.assertEqual(parts[0][0], 5.0)
+        self.assertEqual(parts[-1][1], 305.0)
+        for start, end in parts:
+            self.assertTrue(30.0 <= end - start <= 60.0, parts)
+        for (_, previous_end), (next_start, _) in zip(parts, parts[1:]):
+            self.assertAlmostEqual(previous_end, next_start, places=3)
+
+    def test_split_avoids_the_15_and_30_second_conflict_boundaries(self):
+        for end in (60.02, 61.0, 90.001, 90.05, 120.0, 150.0, 240.0, 300.0, 601.0):
+            for start, stop in split_long_segment(0.0, end):
+                for boundary in (15.0, 30.0):
+                    self.assertGreater(abs((stop - start) - boundary), 0.05,
+                                       f"{end}s 切出 {start}-{stop} 压在 {boundary}s 边界上")
+
+    def test_analyze_source_splits_long_shots_and_records_the_part_number(self):
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / 'test.sqlite3')
+            sid, _ = db.add_source({'platform': 'test', 'video_id': 'long', 'url': 'https://example.test/long'})
+            db.update_source(sid, proxy_path=str(Path(tmp) / 'proxy.mp4'))
+            rules = Mock()
+            rules.buckets = {}
+            rules.duration_bucket = Mock(return_value=('long', None, ''))
+            rules.evaluate = Mock(return_value=[])
+            rules.unit_gate = Mock(return_value=None)
+            rules.automatic_reject = Mock(return_value=False)
+            pipeline = MediaPipeline(SimpleNamespace(data_dir=Path(tmp)), db, rules)
+            pipeline.probe = Mock(return_value={'playable': True, 'duration': 300.0})
+            pipeline.detect_shots = Mock(return_value=[(0.0, 300.0)])
+            pipeline.representative_frame_hash = Mock(return_value=None)
+            pipeline.subject_analyzer = Mock(analyze=Mock(return_value=SimpleNamespace(
+                segments=((0.0, 300.0),), facts_for=lambda segment: {})))
+
+            created = pipeline.analyze_source(sid)
+
+            self.assertGreater(len(created), 1)
+            notes = [json.loads(db.get_candidate(cid)['facts_json'])['split_note'] for cid in created]
+            self.assertEqual(notes, [f'长镜头等分 {i}/{len(created)}' for i in range(1, len(created) + 1)])
+            durations = [db.get_candidate(cid)['duration'] for cid in created]
+            self.assertTrue(all(30.0 <= value <= 60.0 for value in durations), durations)
 
 
 if __name__ == "__main__":

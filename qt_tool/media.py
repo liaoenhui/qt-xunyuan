@@ -168,6 +168,55 @@ def source_live_reason(metadata: dict[str, Any]) -> str | None:
     return None
 
 
+# CONFLICT-003：PDF 的时长档位在 15.0s 和 30.0s 上重叠，切片必须主动避开精确边界，
+# 否则 RuleEngine.duration_bucket 会把候选判成 CONFLICT 并挡在自动交付之外。
+DURATION_BOUNDARIES = (15.0, 30.0)
+DURATION_BOUNDARY_TOLERANCE = 0.05
+DURATION_BOUNDARY_NUDGE = 0.1
+_SPLIT_EPSILON = 1e-9
+
+
+def _on_duration_boundary(seconds: float) -> bool:
+    return any(abs(seconds - boundary) <= DURATION_BOUNDARY_TOLERANCE for boundary in DURATION_BOUNDARIES)
+
+
+def _equal_part_count(length: float, target: float, minimum: float, maximum: float) -> int:
+    """满足每段落在 [minimum, maximum] 的等分段数，优先贴近 target。"""
+    fewest = max(1, math.ceil(length / maximum - _SPLIT_EPSILON))
+    # 段数上限就是“最后一段不足 minimum 时并入前一段”：少切一刀等于把尾巴摊给其余各段。
+    most = max(fewest, int(length / minimum + _SPLIT_EPSILON))
+    wanted = min(max(math.ceil(length / target - _SPLIT_EPSILON), fewest), most)
+    # 等分后各段等长，一旦整体压在档位边界上就换一个段数重新均分。
+    for count in sorted(range(fewest, most + 1), key=lambda c: (abs(c - wanted), c)):
+        if not _on_duration_boundary(length / count):
+            return count
+    return wanted
+
+
+def split_long_segment(start: float, end: float, target: float = 45.0,
+                       minimum: float = 30.0, maximum: float = 60.0) -> list[tuple[float, float]]:
+    """把超过 maximum 的单镜头段等分成若干 minimum–maximum 的候选。
+
+    超过 60s 的段仍然只计入长档，多出来的时长拿不到任何额度，所以在建候选前就按
+    target 等分；不超过 maximum 的段原样返回，边界仍由人工裁剪面板决定。
+    """
+    length = end - start
+    if length <= maximum + _SPLIT_EPSILON:
+        return [(round(start, 3), round(end, 3))]
+    count = _equal_part_count(length, target, minimum, maximum)
+    step = length / count
+    cuts = [start + index * step for index in range(count)] + [end]
+    # 段首段尾必须贴合原镜头，只有内部切点可以微调 0.1s 躲开 15.0/30.0 边界。
+    for _ in range(count):
+        for index in range(1, count):
+            while _on_duration_boundary(cuts[index] - cuts[index - 1]):
+                cuts[index] -= DURATION_BOUNDARY_NUDGE
+        if not _on_duration_boundary(cuts[-1] - cuts[-2]):
+            break
+        cuts[-2] -= DURATION_BOUNDARY_NUDGE
+    return [(round(a, 3), round(b, 3)) for a, b in zip(cuts, cuts[1:])]
+
+
 def merge_facts(base_json: str, probe: dict[str, Any], **overrides: Any) -> dict[str, Any]:
     facts = dict(json.loads(base_json or "{}"))
     facts.update(probe)
@@ -620,27 +669,33 @@ class MediaPipeline:
             # reaches stage 2, where sustained subject absence creates new
             # reviewable slices instead of rejecting the whole source.
             subject = self.subject_analyzer.analyze(path, shot_start, shot_end, unit)
-            for start, end in subject.segments:
-                duration = end - start
-                frame_hash = self.representative_frame_hash(path, start + duration / 2)
-                if frame_hash and self.db.candidate_hash_exists(frame_hash):
-                    continue
-                duration_bucket, _, _ = self.rules.duration_bucket(duration)
-                facts = dict(info, duration=duration, shot_count=1, unit=unit, bucket=bucket,
-                             material_type=material_type, source_type="PROXY", **subject.facts_for((start, end)))
-                cid, created = self.db.add_candidate({"source_id": source_id, "start_time": start, "end_time": end,
-                    "duration": duration, "proxy_path": str(path), "candidate_bucket": bucket, "candidate_unit": unit,
-                    "material_type": material_type, "duration_bucket": duration_bucket, "score": source.get("source_score", 0),
-                    "representative_hash": frame_hash, "facts": facts})
-                if created:
-                    results = self.rules.evaluate(facts)
-                    gate = self.rules.unit_gate(unit)
-                    if gate:
-                        results.append(gate)
-                    self.db.save_rule_results(cid, [r.to_dict() for r in results])
-                    if self.rules.automatic_reject(results):
-                        self.db.review(cid, {"decision": "REJECT", "notes": "程序确定性硬规则自动淘汰"})
-                    created_ids.append(cid)
+            for segment in subject.segments:
+                # 一个 5 分钟的长镜头只能占一个长档名额，先等分成 30-60s 的交付片段，
+                # 人工不必再靠裁剪面板一刀一刀切。
+                parts = split_long_segment(*segment)
+                for part_index, (start, end) in enumerate(parts, start=1):
+                    duration = end - start
+                    frame_hash = self.representative_frame_hash(path, start + duration / 2)
+                    if frame_hash and self.db.candidate_hash_exists(frame_hash):
+                        continue
+                    duration_bucket, _, _ = self.rules.duration_bucket(duration)
+                    facts = dict(info, duration=duration, shot_count=1, unit=unit, bucket=bucket,
+                                 material_type=material_type, source_type="PROXY", **subject.facts_for(segment))
+                    if len(parts) > 1:
+                        facts["split_note"] = f"长镜头等分 {part_index}/{len(parts)}"
+                    cid, created = self.db.add_candidate({"source_id": source_id, "start_time": start, "end_time": end,
+                        "duration": duration, "proxy_path": str(path), "candidate_bucket": bucket, "candidate_unit": unit,
+                        "material_type": material_type, "duration_bucket": duration_bucket, "score": source.get("source_score", 0),
+                        "representative_hash": frame_hash, "facts": facts})
+                    if created:
+                        results = self.rules.evaluate(facts)
+                        gate = self.rules.unit_gate(unit)
+                        if gate:
+                            results.append(gate)
+                        self.db.save_rule_results(cid, [r.to_dict() for r in results])
+                        if self.rules.automatic_reject(results):
+                            self.db.review(cid, {"decision": "REJECT", "notes": "程序确定性硬规则自动淘汰"})
+                        created_ids.append(cid)
         self.db.update_source(source_id, status="WAITING_REVIEW", analysis_completed=1, error=None)
         return created_ids
 
