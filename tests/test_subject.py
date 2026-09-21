@@ -4,7 +4,9 @@ import unittest
 from pathlib import Path
 
 from qt_tool.rules import RuleEngine
-from qt_tool.subject import SUPPORTED_PERSON_UNITS, SubjectContinuityAnalyzer
+from qt_tool.subject import (SAMPLE_INTERVAL_SECONDS, SUPPORTED_PERSON_UNITS,
+                             SUSTAINED_LOSS_SECONDS, SubjectContinuityAnalyzer,
+                             split_presence_samples)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,6 +35,34 @@ class SupportedUnitTests(unittest.TestCase):
     def test_missing_unit_is_not_supported(self):
         self.assertFalse(SubjectContinuityAnalyzer.supports(None))
         self.assertFalse(SubjectContinuityAnalyzer.supports("T9.9"))
+
+
+class SustainedLossThresholdTests(unittest.TestCase):
+    def presence(self, until: float, resume: float, end: float) -> list[float]:
+        steps = int(round(until / SAMPLE_INTERVAL_SECONDS)) + 1
+        times = [index * SAMPLE_INTERVAL_SECONDS for index in range(steps)]
+        while resume <= end:
+            times.append(round(resume, 3))
+            resume += SAMPLE_INTERVAL_SECONDS
+        return times
+
+    def test_calibrated_defaults(self):
+        self.assertEqual(SAMPLE_INTERVAL_SECONDS, 0.25)
+        self.assertEqual(SUSTAINED_LOSS_SECONDS, 3.5)
+        analyzer = SubjectContinuityAnalyzer(Path("missing"))
+        self.assertEqual(analyzer.sample_interval, 0.25)
+        self.assertEqual(analyzer.minimum_loss, 3.5)
+
+    def test_absence_of_exactly_the_threshold_splits(self):
+        segments, gaps = split_presence_samples(0.0, 20.0, self.presence(10.0, 13.75, 20.0))
+        self.assertEqual(segments, ((0.0, 10.125), (13.75, 20.0)))
+        self.assertEqual(len(gaps), 1)
+        self.assertEqual(gaps[0]["duration"], 3.625)
+
+    def test_absence_below_the_threshold_keeps_one_segment(self):
+        segments, gaps = split_presence_samples(0.0, 20.0, self.presence(10.0, 13.5, 20.0))
+        self.assertEqual(segments, ((0.0, 20.0),))
+        self.assertEqual(gaps, ())
 
 
 if __name__ == "__main__":  # pragma: no cover

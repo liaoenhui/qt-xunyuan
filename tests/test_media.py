@@ -90,16 +90,16 @@ class MediaTests(unittest.TestCase):
         self.assertIsNone(select_motion_valley(samples))
 
     def test_subject_loss_splits_instead_of_rejecting_whole_shot(self):
-        present = [index / 2 for index in range(0, 29)]
-        present += [19 + index / 2 for index in range(0, 16)]
+        present = [index / 4 for index in range(0, 57)]
+        present += [19 + index / 4 for index in range(0, 31)]
         segments, gaps = split_presence_samples(0.0, 26.62, present)
-        self.assertEqual(segments, ((0.0, 14.25), (19.0, 26.62)))
-        self.assertEqual(gaps, ({"start": 14.25, "end": 19.0, "duration": 4.75},))
+        self.assertEqual(segments, ((0.0, 14.125), (19.0, 26.62)))
+        self.assertEqual(gaps, ({"start": 14.125, "end": 19.0, "duration": 4.875},))
 
     def test_short_detector_dropout_does_not_split(self):
-        present = [index / 2 for index in range(0, 29)]
-        present += [18 + index / 2 for index in range(0, 3)]
-        present += [22 + index / 2 for index in range(0, 10)]
+        present = [index / 4 for index in range(0, 57)]
+        present += [17 + index / 4 for index in range(0, 3)]
+        present += [21 + index / 4 for index in range(0, 23)]
         segments, gaps = split_presence_samples(0.0, 26.5, present)
         self.assertEqual(segments, ((0.0, 26.5),))
         self.assertEqual(gaps, ())

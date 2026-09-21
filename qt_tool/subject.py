@@ -24,6 +24,14 @@ SUPPORTED_PERSON_UNITS = frozenset({
     "T8.4",
 })
 
+# Calibrated against 161 labelled clips. A 0.25s grid keeps a fast subject on
+# the timeline between samples, and 3.5s is the shortest sustained absence that
+# never cut a clip a reviewer had accepted; a 1.5s threshold chopped 6 of the 27
+# accepted clips into unusable pieces. Both values are constructor arguments so
+# a future re-calibration does not have to touch the analysis code.
+SAMPLE_INTERVAL_SECONDS = 0.25
+SUSTAINED_LOSS_SECONDS = 3.5
+
 
 @dataclass(frozen=True)
 class SubjectContinuity:
@@ -58,8 +66,8 @@ def split_presence_samples(
     end: float,
     present_times: list[float],
     *,
-    sample_interval: float = 0.5,
-    minimum_loss: float = 4.0,
+    sample_interval: float = SAMPLE_INTERVAL_SECONDS,
+    minimum_loss: float = SUSTAINED_LOSS_SECONDS,
     minimum_segment: float = 5.0,
 ) -> tuple[tuple[tuple[float, float], ...], tuple[dict[str, float], ...]]:
     """Split only on sustained absence, retaining every independently useful side.
@@ -133,8 +141,11 @@ class SubjectContinuityAnalyzer:
 
     VOC_PERSON_CLASS = 15
 
-    def __init__(self, model_dir: Path):
+    def __init__(self, model_dir: Path, sample_interval: float = SAMPLE_INTERVAL_SECONDS,
+                 minimum_loss: float = SUSTAINED_LOSS_SECONDS):
         self.model_dir = Path(model_dir)
+        self.sample_interval = float(sample_interval)
+        self.minimum_loss = float(minimum_loss)
         self.prototxt = self.model_dir / "mobilenet_ssd_deploy.prototxt"
         self.weights = self.model_dir / "mobilenet_ssd.caffemodel"
         self._cv2 = None
@@ -272,7 +283,7 @@ class SubjectContinuityAnalyzer:
             return SubjectContinuity(True, False, "UNREADABLE", original,
                                      evidence={"method": "mobilenet_ssd_prominent_person"})
 
-        sample_interval = 0.5
+        sample_interval = self.sample_interval
         samples: list[tuple[float, float]] = []
         at = float(start)
         try:
@@ -294,7 +305,12 @@ class SubjectContinuityAnalyzer:
         prominence_floor = max(0.014, baseline * 0.30)
         present = [at for at, area in samples if area >= prominence_floor]
         seed_present = [at for at in present if at <= seed_end]
-        reliable = len(seed_present) >= 4 and len(present) >= 6 and (not present or present[0] <= start + 1.0)
+        # The confidence floor is expressed in seconds of confirmed presence, so
+        # a denser sampling grid does not silently weaken it.
+        need_seed = max(4, int(round(2.0 / sample_interval)))
+        need_total = max(6, int(round(3.0 / sample_interval)))
+        reliable = (len(seed_present) >= need_seed and len(present) >= need_total
+                    and (not present or present[0] <= start + 1.0))
         evidence = {
             "method": "mobilenet_ssd_prominent_person",
             "sample_interval": sample_interval,
@@ -306,7 +322,8 @@ class SubjectContinuityAnalyzer:
         if not reliable:
             return SubjectContinuity(True, False, "LOW_CONFIDENCE", original, evidence=evidence)
 
-        segments, gaps = split_presence_samples(start, end, present, sample_interval=sample_interval)
+        segments, gaps = split_presence_samples(start, end, present, sample_interval=sample_interval,
+                                                minimum_loss=self.minimum_loss)
         status = "SPLIT" if len(segments) > 1 or segments != original else "PASS"
         boundary_advice = self._boundary_advice(path, segments, gaps)
         return SubjectContinuity(True, True, status, segments, gaps, evidence, boundary_advice)
