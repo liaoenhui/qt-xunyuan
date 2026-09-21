@@ -21,7 +21,7 @@
     "avoid_exact_boundaries": true
   },
   "technical_specifications": {
-    "live_action": {"buckets": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"], "minimum_width": 2560, "minimum_height": 1440, "minimum_fps": 24.0},
+    "live_action": {"buckets": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"], "minimum_width": 2560, "minimum_height": 1440, "minimum_fps": 23.9, "_note": "文档原文为不低于 24fps；23.976fps（24000/1001）是 NTSC 标准 24p，判定下限取 23.9 以免误杀，真正低于 24p 的帧率仍然 FAIL。"},
     "stylized": {"buckets": ["T9"], "minimum_width": 1920, "minimum_height": 1080, "minimum_fps": null},
     "aspect_ratio": {"minimum": 1.5, "maximum": 2.0},
     "container": ["mp4"],

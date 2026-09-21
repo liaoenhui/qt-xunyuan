@@ -102,6 +102,21 @@ class RuleEngineTests(unittest.TestCase):
         self.assertEqual(qualified_final.status, RuleStatus.UNKNOWN)
         self.assertFalse(qualified_final.deterministic)
 
+    def test_ntsc_24p_passes_the_frame_rate_spec(self):
+        result = self.result("SPEC_FPS", bucket="T1", unit="T1.1", source_type="FINAL",
+                             material_type="live_action", fps=23.976)
+        self.assertEqual(result.status, RuleStatus.PASS)
+        self.assertTrue(result.deterministic)
+
+    def test_frame_rates_below_24p_still_fail(self):
+        for fps in (23.0, 23.5, 15.0):
+            result = self.result("SPEC_FPS", bucket="T1", unit="T1.1", source_type="FINAL",
+                                 material_type="live_action", fps=fps)
+            self.assertEqual(result.status, RuleStatus.FAIL, fps)
+
+    def test_frame_rate_threshold_comes_from_the_rules_file(self):
+        self.assertEqual(self.engine.live_action_minimum_fps(), 23.9)
+
 
 if __name__ == "__main__":
     unittest.main()

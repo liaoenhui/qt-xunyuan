@@ -30,6 +30,12 @@ class RuleResult:
         return data
 
 
+# 规则文档写的是 24fps，但胶片/影视素材的标准 24p 实际是 23.976fps（24000/1001，
+# NTSC 拉制），直接用 >= 24 判定会把合格的 24p 原片判成 FAIL。阈值下探到 23.9，
+# 既放过 23.976，也仍然挡住真正低于 24p 的 23.5 等帧率。
+MINIMUM_LIVE_ACTION_FPS = 23.9
+
+
 def _load_json_yaml(path: Path) -> dict[str, Any]:
     # Files intentionally use JSON syntax, which is a valid YAML 1.2 subset.
     return json.loads(path.read_text(encoding="utf-8"))
@@ -225,8 +231,16 @@ class RuleEngine:
             return RuleResult("SPEC_FPS", RuleStatus.UNKNOWN, "缺少可靠帧率", {})
         if bucket == "T9":
             return RuleResult("SPEC_FPS", RuleStatus.PASS, "T9 按原作帧率，不设统一下限", {"fps": fps}, True)
-        status = RuleStatus.PASS if float(fps) >= 24 else RuleStatus.FAIL
-        return RuleResult("SPEC_FPS", status, f"实拍桶帧率 {float(fps):.3f} fps，要求不低于 24 fps", {"fps": fps}, True)
+        minimum = self.live_action_minimum_fps()
+        status = RuleStatus.PASS if float(fps) >= minimum else RuleStatus.FAIL
+        return RuleResult("SPEC_FPS", status,
+                          f"实拍桶帧率 {float(fps):.3f} fps，要求不低于 24 fps（23.976 等 NTSC 24p 按 24p 计）",
+                          {"fps": fps, "minimum_fps": minimum}, True)
+
+    def live_action_minimum_fps(self) -> float:
+        specs = self.rules.get("technical_specifications", {}).get("live_action", {})
+        value = specs.get("minimum_fps")
+        return float(value) if value else MINIMUM_LIVE_ACTION_FPS
 
     def _file_specs(self, facts: dict[str, Any]) -> list[RuleResult]:
         results: list[RuleResult] = []
