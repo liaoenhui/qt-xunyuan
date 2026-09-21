@@ -84,6 +84,32 @@ YouTube 的公开素材解析需要 JavaScript 运行时。程序会自动探测
 
 YouTube 若对某条视频要求登录或 Cookie，工具会直接报错，不会绕过登录、验证码、DRM 或平台限制。可换用公开可访问来源，或只登记候选后人工处理合法素材。
 
+## 命令行批量找源
+
+寻源到镜头分析这三步可以脱离网页，用 `tools_batch.py` 无人值守跑，把人工时间集中在审核页。
+在仓库根目录运行：
+
+```powershell
+python tools_batch.py discover T7.4 --queries 6 --limit 10   # 取该单元前 6 条搜索词，每条最多 10 个结果
+python tools_batch.py proxy    T7.4 --top 20                 # 未下代理的来源按 source_score 降序取前 20 条
+python tools_batch.py analyze  T7.4                          # 对已有代理且未分析的来源做镜头分析
+python tools_batch.py run      T7.4                          # discover → proxy → analyze 连跑
+python tools_batch.py status   T7.4                          # 来源/候选状态与自动淘汰原因 Top 10
+python tools_batch.py tools                                  # 打印 ffmpeg / ffprobe / yt-dlp 等可用性
+```
+
+- 单元参数可以写完整子单元（`T7.4`），也可以写整桶（`T7`，按子单元顺序依次取搜索词）。
+- 搜索词来自 `rules/search_templates.yaml`，与网页生产台使用同一套规则和分辨率门槛。
+- `proxy` 会先做规格预检：`FAIL` 计入 `skipped_preflight_fail` 并跳过；`UNKNOWN` 默认跳过并计入
+  `skipped_preflight_unknown`，确认要下载时加 `--allow-unknown`；其余失败计入 `failed` 并打印原因。
+- 每行输出都带 `[HH:MM:SS]` 时间戳。Windows 控制台如出现中文乱码，请在外部设置 `PYTHONIOENCODING=utf-8`。
+- 命令行不创建网页的后台任务记录，因此生产台的“任务进度/取消”按钮看不到它，来源状态与候选结果一致可见。
+
+网页与命令行共用同一个 SQLite（`data/qt_tool.sqlite3`，`journal_mode=WAL`、连接 `timeout=30`），
+可以同时开着：一边用命令行批量找源、下代理、跑分析，一边在
+`http://127.0.0.1:8765/review` 审核已经产出的候选。为避免重复下载同一条来源，
+建议命令行和网页不要同时对同一个单元执行代理下载。
+
 ## 数据目录
 
 ```text
