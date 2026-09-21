@@ -172,7 +172,12 @@ class SubjectContinuityAnalyzer:
         if self._net is None:
             if not self.available:
                 raise RuntimeError("主体检测组件未安装")
-            self._net = self._cv2.dnn.readNetFromCaffe(str(self.prototxt), str(self.weights))
+            # The Caffe importer opens the files through the C++ locale, which
+            # fails on Windows whenever the install path contains non-ASCII
+            # characters. Reading the bytes in Python and handing them over
+            # keeps the model loadable from any path.
+            self._net = self._cv2.dnn.readNetFromCaffe(bufferProto=self.prototxt.read_bytes(),
+                                                       bufferModel=self.weights.read_bytes())
         return self._net
 
     def _person_area_ratios(self, frame) -> list[float]:

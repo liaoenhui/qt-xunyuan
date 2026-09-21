@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -142,6 +143,37 @@ class SequentialDecodeTests(unittest.TestCase):
         result = analyzer.analyze(Path("clip.mp4"), 0.0, 20.0, "T1.1")
         self.assertEqual(result.status, "UNREADABLE")
         self.assertTrue(capture.released)
+
+
+class ModelLoadingTests(unittest.TestCase):
+    def test_model_is_loaded_from_bytes_not_from_a_path(self):
+        calls: list[dict[str, bytes]] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            model_dir = Path(tmp) / "模型"
+            model_dir.mkdir()
+            (model_dir / "mobilenet_ssd_deploy.prototxt").write_bytes(b"proto")
+            (model_dir / "mobilenet_ssd.caffemodel").write_bytes(b"weights")
+
+            class Analyzer(SubjectContinuityAnalyzer):
+                @property
+                def available(self) -> bool:
+                    return True
+
+            analyzer = Analyzer(model_dir)
+            analyzer._cv2 = SimpleNamespace(dnn=SimpleNamespace(
+                readNetFromCaffe=lambda **kwargs: calls.append(kwargs) or "net"))
+            self.assertEqual(analyzer._network(), "net")
+            self.assertEqual(analyzer._network(), "net")
+
+        self.assertEqual(calls, [{"bufferProto": b"proto", "bufferModel": b"weights"}])
+
+    def test_missing_model_still_reports_unavailable(self):
+        analyzer = SubjectContinuityAnalyzer(Path("missing"))
+        self.assertFalse(analyzer.available)
+        with self.assertRaises(RuntimeError):
+            analyzer._network()
+        result = analyzer.analyze(Path("clip.mp4"), 0.0, 20.0, "T1.1")
+        self.assertEqual(result.status, "UNAVAILABLE")
 
 
 class SustainedLossThresholdTests(unittest.TestCase):
