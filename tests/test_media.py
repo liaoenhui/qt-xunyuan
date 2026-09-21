@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from qt_tool.db import Database
 from qt_tool.media import (DownloadStalled, MediaPipeline, _run_download,
-                           delivery_description, merge_facts,
+                           delivery_description, duration_label, merge_facts,
                            source_duration_allowed, source_live_reason,
                            ytdlp_error_message)
 from qt_tool.subject import select_motion_valley, split_presence_samples
@@ -116,12 +116,45 @@ class MediaTests(unittest.TestCase):
         self.assertEqual(facts["height"], 2160)
         self.assertEqual(facts["shot_count"], 4)
 
-    def test_delivery_csv_uses_required_chinese_columns(self):
+    def test_duration_label_matches_ledger_tiers_and_leaves_boundaries_empty(self):
+        self.assertIsNone(duration_label(None))
+        # 不足 5 秒（R17）不允许交付，档位留空交人工，不猜一个档位
+        self.assertIsNone(duration_label(4.9))
+        self.assertEqual(duration_label(5), "5-15S")
+        self.assertEqual(duration_label(14.9), "5-15S")
+        # 15.0 / 30.0 是 CONFLICT-003 的重叠边界，上游标 CONFLICT 交人工，这里同样留空
+        self.assertIsNone(duration_label(15.0))
+        self.assertIsNone(duration_label(30.0))
+        self.assertEqual(duration_label(15.1), "15-30S")
+        self.assertEqual(duration_label(29.9), "15-30S")
+        self.assertEqual(duration_label(30.1), "30-60S")
+        self.assertEqual(duration_label(59), "30-60S")
+        # 超过 60 秒仍计长档
+        self.assertEqual(duration_label(61), "30-60S")
+
+    def test_oss_url_matches_official_delivery_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SimpleNamespace(data_dir=Path(tmp), oss_bucket="futurelab-game-hz",
+                                       oss_prefix="game_data/QT寻源全包供应商正式作业/CS")
+            pipeline = MediaPipeline(settings, SimpleNamespace(), None)
+            self.assertEqual(
+                pipeline.oss_url_for("T7/T7.6_001_液体界面移动.mp4"),
+                "oss://futurelab-game-hz/game_data/QT寻源全包供应商正式作业/CS/T7/T7.6_001_液体界面移动.mp4")
+            # Windows 分隔符和多余斜杠都要归一化
+            self.assertEqual(
+                pipeline.oss_url_for("\\T7\\T7.6_001_液体界面移动.mp4"),
+                "oss://futurelab-game-hz/game_data/QT寻源全包供应商正式作业/CS/T7/T7.6_001_液体界面移动.mp4")
+            self.assertEqual(pipeline.deliver_dir_for("T7"), Path(tmp) / "deliverable" / "CS" / "T7")
+
+    def test_delivery_csv_matches_shared_ledger_columns(self):
         row = {
-            "candidate_id": 42,
+            "candidate_id": 42, "bucket": "T1", "unit": "T1.1",
             "viewpoint": "third_person", "created_at": "2026-09-20T10:00:00+00:00",
             "exported_at": "2026-09-20T11:00:00+00:00",
-            "unit": "T1.1", "width": 3840, "height": 2160, "duration": 12.3456,
+            "delivery_unit": "T1.1", "delivery_sequence": 1,
+            "delivery_filename": "T1.1_001_城市跑步跟拍.mp4",
+            "final_path": "E:\\data\\deliverable\\CS\\T1\\T1.1_001_城市跑步跟拍.mp4",
+            "width": 3840, "height": 2160, "duration": 12.3456,
         }
 
         class DeliveryDB:
@@ -138,21 +171,35 @@ class MediaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             data_dir = Path(tmp)
             (data_dir / "deliverable").mkdir()
-            pipeline = MediaPipeline(SimpleNamespace(data_dir=data_dir), DeliveryDB(), None)
+            settings = SimpleNamespace(data_dir=data_dir, oss_bucket="futurelab-game-hz",
+                                       oss_prefix="game_data/QT寻源全包供应商正式作业/CS",
+                                       delivery_owner="翁路凯")
+            rules = SimpleNamespace(units={"T1.1": {"name": "跑酷/跑跳/越障"}})
+            pipeline = MediaPipeline(settings, DeliveryDB(), rules)
             output = pipeline.export_delivery_csv()
             with output.open(encoding="utf-8-sig", newline="") as stream:
                 exported = list(csv.DictReader(stream))
 
-        self.assertEqual(list(exported[0]), ["人称", "OSS路径", "交付时间", "统合单元", "分辨率", "时长"])
-        self.assertEqual(exported[0]["人称"], "第三人称")
-        self.assertEqual(exported[0]["OSS路径"], "OSS")
-        self.assertEqual(exported[0]["交付时间"], "2026-09-20T11:00:00+00:00")
-        self.assertEqual(exported[0]["统合单元"], "T1.1")
+        self.assertEqual(list(exported[0])[:9],
+                         ["时间", "领取人", "oss链接", "视频时长", "桶", "桶的具体类目", "内部质检", "验收", "备注"])
+        self.assertEqual(list(exported[0])[9:], ["单元", "分辨率", "时长秒", "本地路径"])
+        self.assertEqual(exported[0]["时间"], "2026-09-20")
+        self.assertEqual(exported[0]["领取人"], "翁路凯")
+        self.assertEqual(exported[0]["oss链接"],
+                         "oss://futurelab-game-hz/game_data/QT寻源全包供应商正式作业/CS/T1/T1.1_001_城市跑步跟拍.mp4")
+        self.assertEqual(exported[0]["视频时长"], "5-15S")
+        self.assertEqual(exported[0]["桶"], "T1")
+        self.assertEqual(exported[0]["桶的具体类目"], "跑酷/跑跳/越障")
+        self.assertEqual(exported[0]["内部质检"], "")
+        self.assertEqual(exported[0]["验收"], "")
+        self.assertEqual(exported[0]["备注"], "")
+        self.assertEqual(exported[0]["单元"], "T1.1")
         self.assertEqual(exported[0]["分辨率"], "3840x2160")
-        self.assertEqual(exported[0]["时长"], "12.346")
+        self.assertEqual(exported[0]["时长秒"], "12.346")
+        self.assertEqual(exported[0]["本地路径"], row["final_path"])
         self.assertEqual(DeliveryDB.exported_ids, [42])
 
-    def test_pipeline_repairs_legacy_delivery_filename(self):
+    def test_pipeline_moves_legacy_deliverable_into_oss_layout(self):
         with tempfile.TemporaryDirectory() as tmp:
             data_dir = Path(tmp)
             db_path = data_dir / "test.sqlite3"
@@ -160,20 +207,84 @@ class MediaTests(unittest.TestCase):
             source_id, _ = db.add_source({"platform": "youtube", "video_id": "legacy",
                                           "url": "https://example.test/v", "title": "城市跑步跟拍"})
             candidate_id, _ = db.add_candidate({"source_id": source_id, "start_time": 0.0, "end_time": 10.0,
-                                                 "duration": 10.0, "candidate_unit": "T1.1", "facts": {}})
-            deliver_dir = data_dir / "deliverable" / "QT寻源数据" / "T1_高动态载具" / "第三人称"
-            deliver_dir.mkdir(parents=True)
-            legacy_path = deliver_dir / "unknown_legacy-1.mp4"
+                                                "duration": 10.0, "candidate_bucket": "T1",
+                                                "candidate_unit": "T1.1", "facts": {}})
+            legacy_dir = data_dir / "deliverable" / "QT寻源数据" / "T1_高动态载具" / "第三人称"
+            legacy_dir.mkdir(parents=True)
+            legacy_path = legacy_dir / "unknown_legacy-1.mp4"
             legacy_path.write_bytes(b"video")
             db.create_final_clip(candidate_id, final_path=str(legacy_path), qa_status="PASS",
                                  deliverable_status="READY")
 
             migrated = Database(db_path)
             MediaPipeline(SimpleNamespace(data_dir=data_dir), migrated, None)
-            expected = deliver_dir / "T1.1_001_城市跑步跟拍.mp4"
+            expected = data_dir / "deliverable" / "CS" / "T1" / "T1.1_001_城市跑步跟拍.mp4"
             self.assertTrue(expected.is_file())
             self.assertFalse(legacy_path.exists())
             self.assertEqual(migrated.delivery_rows()[0]["final_path"], str(expected))
+
+    def test_repair_keeps_compliant_deliverable_in_place(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            db_path = data_dir / "test.sqlite3"
+            db = Database(db_path)
+            source_id, _ = db.add_source({"platform": "youtube", "video_id": "ok",
+                                          "url": "https://example.test/ok", "title": "城市跑步跟拍"})
+            candidate_id, _ = db.add_candidate({"source_id": source_id, "start_time": 0.0, "end_time": 10.0,
+                                                "duration": 10.0, "candidate_bucket": "T7",
+                                                "candidate_unit": "T7.6", "facts": {}})
+            deliver_dir = data_dir / "deliverable" / "CS" / "T7"
+            deliver_dir.mkdir(parents=True)
+            current = deliver_dir / "T7.6_001_液体界面移动.mp4"
+            current.write_bytes(b"video")
+            db.create_final_clip(candidate_id, final_path=str(current), qa_status="PASS",
+                                 deliverable_status="READY")
+            with db.connect() as con:
+                con.execute("UPDATE final_clips SET delivery_unit='T7.6',delivery_sequence=1,"
+                            "delivery_filename='T7.6_001_液体界面移动.mp4' WHERE candidate_id=?",
+                            (candidate_id,))
+
+            pipeline = MediaPipeline(SimpleNamespace(data_dir=data_dir), Database(db_path), None)
+            self.assertEqual(pipeline.repair_delivery_filenames(), 0)
+            self.assertTrue(current.is_file())
+            self.assertEqual(pipeline.db.delivery_rows()[0]["final_path"], str(current))
+
+    def test_delivery_prefers_reviewer_description_over_source_title(self):
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp)
+            db = Database(data_dir / "test.sqlite3")
+            source_id, _ = db.add_source({"platform": "youtube", "video_id": "desc",
+                                          "url": "https://example.test/d", "title": "Random Clip Title"})
+            candidate_id, _ = db.add_candidate({"source_id": source_id, "start_time": 0.0, "end_time": 10.0,
+                                                "duration": 10.0, "candidate_bucket": "T7",
+                                                "candidate_unit": "T7.6", "facts": {}})
+            db.review(candidate_id, {"decision": "ACCEPT", "final_viewpoint": "third_person",
+                                     "delivery_description": "液体界面移动"})
+            self.assertEqual(db.get_candidate(candidate_id)["delivery_description"], "液体界面移动")
+
+            clip = data_dir / "clips" / "clip.mp4"
+            clip.parent.mkdir(parents=True, exist_ok=True)
+            clip.write_bytes(b"video")
+            rules = Mock()
+            rules._r9.return_value = SimpleNamespace(status=None, to_dict=lambda: {})
+            rules.evaluate.return_value = []
+            rules.unit_gate.return_value = None
+            rules.automatic_reject.return_value = False
+            pipeline = MediaPipeline(SimpleNamespace(data_dir=data_dir), db, rules)
+            pipeline.download_final = Mock(return_value=data_dir / "original.mp4")
+            pipeline.probe = Mock(return_value={"width": 3840, "height": 2160, "duration": 10.0, "has_audio": 0})
+            pipeline.black_ratio = Mock(return_value=0.0)
+            pipeline.detect_shots = Mock(return_value=[(0.0, 10.0)])
+            pipeline._clip_path = Mock(return_value=clip)
+            pipeline.subject_analyzer = Mock()
+            pipeline.subject_analyzer.analyze.return_value = SimpleNamespace(
+                status="OK", segments=(), facts_for=lambda segment: {})
+            result = pipeline.final_qa_and_deliver(candidate_id)
+
+            self.assertEqual(result["qa_status"], "PASS")
+            self.assertEqual(Path(result["final_path"]),
+                             data_dir / "deliverable" / "CS" / "T7" / "T7.6_001_液体界面移动.mp4")
 
 
 if __name__ == "__main__":

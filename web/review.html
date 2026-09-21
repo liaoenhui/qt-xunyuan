@@ -8,6 +8,7 @@
     <aside class="card">
       <div class="section-head"><div><h2 id="candidate-title">候选判断</h2><p id="queue-meta">载入中…</p></div><div class="list-controls"><select id="review-bucket-filter" aria-label="审核分类"></select></div></div>
       <div class="recommend"><div><label>桶</label><select id="bucket"></select></div><div><label>单元</label><select id="unit"></select></div><div><label>人称</label><select id="viewpoint"><option value="">待人工判断</option><option value="first_person">第一人称</option><option value="third_person">第三人称</option></select></div></div>
+      <input id="description" type="text" maxlength="40" placeholder="交付文件简述（如 液体界面移动；留空则用来源标题）">
       <textarea id="notes" rows="2" placeholder="拒绝原因、if→then、物理反馈等备注"></textarea>
       <div class="trim-panel">
         <div class="trim-head"><strong>自动建议边界 + 人工微调</strong><span id="boundary-risk" class="badge">待分析</span></div>

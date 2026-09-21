@@ -59,6 +59,10 @@ class Settings:
     ai_api_key: str
     ai_api_url: str
     ai_model: str
+    oss_bucket: str
+    oss_endpoint: str
+    oss_prefix: str
+    delivery_owner: str
     host: str
     port: int
     max_preflight_concurrency: int = 3
@@ -120,6 +124,11 @@ def load_settings() -> Settings:
         ai_api_key=os.environ.get("AI_API_KEY", ""),
         ai_api_url=os.environ.get("AI_API_URL", ""),
         ai_model=os.environ.get("AI_MODEL", ""),
+        # 正式交付地址：oss://{oss_bucket}/{oss_prefix}/T{n}/文件名.mp4
+        oss_bucket=os.environ.get("OSS_BUCKET", "futurelab-game-hz"),
+        oss_endpoint=os.environ.get("OSS_ENDPOINT", "oss-cn-hangzhou.aliyuncs.com"),
+        oss_prefix=os.environ.get("OSS_PREFIX", "game_data/QT寻源全包供应商正式作业/CS").strip("/"),
+        delivery_owner=os.environ.get("DELIVERY_OWNER", ""),
         host=os.environ.get("HOST", "127.0.0.1"),
         port=_as_int("PORT", 8765),
     )

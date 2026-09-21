@@ -184,6 +184,35 @@ def delivery_description(title: str, limit: int = 60) -> str:
     return (value[:limit].rstrip(" ._") or "视频片段")
 
 
+DURATION_LABELS = {"short": "5-15S", "medium": "15-30S", "long": "30-60S"}
+
+
+def duration_label(seconds: float | None) -> str | None:
+    """Return the shared ledger duration tier, or None when it needs a human.
+
+    The ledger only accepts ``5-15S`` / ``15-30S`` / ``30-60S``. Anything the
+    rule book refuses to bucket on its own returns ``None`` so the cell stays
+    empty instead of carrying a guess: a missing duration, a clip under the
+    5 second minimum (R17), and the exact 15.0/30.0 tier boundaries that
+    CONFLICT-003 reserves for manual confirmation.
+    """
+    if seconds is None:
+        return None
+    try:
+        value = float(seconds)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value) or value < 5.0:
+        return None
+    if math.isclose(value, 15.0, abs_tol=0.001) or math.isclose(value, 30.0, abs_tol=0.001):
+        return None
+    if value < 15.0:
+        return DURATION_LABELS["short"]
+    if value < 30.0:
+        return DURATION_LABELS["medium"]
+    return DURATION_LABELS["long"]
+
+
 def tool_status(settings: Settings) -> dict[str, bool]:
     subject = SubjectContinuityAnalyzer(settings.root / "tools" / "models")
     return {
@@ -228,7 +257,13 @@ class MediaPipeline:
             self.repair_delivery_filenames()
 
     def repair_delivery_filenames(self) -> int:
-        """Rename legacy deliverables and update their persisted standard names."""
+        """Move legacy deliverables into deliverable/CS/T{n}/ under the standard name.
+
+        The name contract (``T{桶}.{单元}_{序号3位}_{简述}.mp4``) is unchanged, so a
+        file that already complies keeps its name and is only relocated when it
+        still sits in an old folder. Anything outside the deliverable tree, or
+        whose bucket cannot be derived, is left untouched.
+        """
         root = (self.settings.data_dir / "deliverable").resolve()
         renamed = 0
         for row in self.db.delivery_filename_rows():
@@ -238,16 +273,20 @@ class MediaPipeline:
                 continue
             stored_name = str(row.get("delivery_filename") or "")
             compliant = re.fullmatch(rf"{re.escape(unit)}_{sequence:03d}_.+\.mp4", stored_name, re.IGNORECASE)
-            filename = stored_name if compliant else f"{unit}_{sequence:03d}_{delivery_description(row.get('source_title') or '')}.mp4"
+            description = delivery_description(row.get("delivery_description") or row.get("source_title") or "")
+            filename = stored_name if compliant else f"{unit}_{sequence:03d}_{description}.mp4"
+            bucket = str(row.get("bucket") or unit.split(".", 1)[0] or "")
             old_path = Path(str(row.get("final_path") or ""))
             final_path = old_path
             if old_path.is_file():
                 resolved = old_path.resolve()
                 if root == resolved.parent or root in resolved.parents:
-                    target = old_path.with_name(filename)
+                    target_dir = self.deliver_dir_for(bucket) if bucket and bucket != "UNSET" else old_path.parent
+                    target = target_dir / filename
                     if target != old_path:
                         if target.exists():
                             raise FileExistsError(f"交付文件名冲突：{target}")
+                        target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(old_path, target)
                         if target.stat().st_size != old_path.stat().st_size:
                             target.unlink(missing_ok=True)
@@ -742,6 +781,17 @@ class MediaPipeline:
             raise RuntimeError(proc.stderr[-2000:] or "最终剪片失败")
         return output
 
+    def deliver_dir_for(self, bucket: str) -> Path:
+        """Mirror the official OSS layout locally: deliverable/CS/T{n}/."""
+        return self.settings.data_dir / "deliverable" / "CS" / (bucket or "UNSET")
+
+    def oss_url_for(self, relative_path: str | Path) -> str:
+        """Build the official OSS URL for a path relative to the CS prefix."""
+        oss_bucket = getattr(self.settings, "oss_bucket", "futurelab-game-hz")
+        prefix = str(getattr(self.settings, "oss_prefix", "game_data/QT寻源全包供应商正式作业/CS")).strip("/")
+        relative = str(relative_path).replace("\\", "/").strip("/")
+        return f"oss://{oss_bucket}/{prefix}/{relative}" if prefix else f"oss://{oss_bucket}/{relative}"
+
     def final_qa_and_deliver(self, candidate_id: int) -> dict[str, Any]:
         with self._final_lock_guard:
             lock = self._final_candidate_locks.setdefault(candidate_id, Lock())
@@ -816,13 +866,10 @@ class MediaPipeline:
         if qa_status == "PASS":
             bucket = candidate.get("candidate_bucket") or "UNSET"
             unit = candidate.get("candidate_unit") or "UNSET"
-            bucket_name = self.rules.buckets.get(bucket, {}).get("name", "未分类")
-            viewpoint = "第一人称" if candidate.get("candidate_viewpoint") == "first_person" else "第三人称"
-            deliver_dir = self.settings.data_dir / "deliverable" / "QT寻源数据" / f"{bucket}_{bucket_name}" / viewpoint
+            deliver_dir = self.deliver_dir_for(bucket)
             deliver_dir.mkdir(parents=True, exist_ok=True)
-            assignment = self.db.reserve_delivery_filename(
-                candidate_id, unit, delivery_description(candidate.get("source_title") or "")
-            )
+            description = delivery_description(candidate.get("delivery_description") or candidate.get("source_title") or "")
+            assignment = self.db.reserve_delivery_filename(candidate_id, unit, description)
             final_path = deliver_dir / assignment["filename"]
             shutil.copy2(clip, final_path)
             self.db.update_final_clip_delivery(candidate_id, str(final_path), assignment["filename"], "READY")
@@ -834,10 +881,13 @@ class MediaPipeline:
                 "rules": [r.to_dict() for r in results]}
 
     def export_delivery_csv(self) -> Path:
+        """Export the shared ledger (Sheet1) columns plus local cross-check columns."""
         rows = self.db.delivery_rows()
-        delivery_time = datetime.now(UTC).isoformat()
+        export_time = datetime.now(UTC)
+        delivery_time = export_time.isoformat()
         output = self.settings.data_dir / "deliverable" / "QT寻源数据_交付信息表.csv"
-        fields = ["人称", "OSS路径", "交付时间", "统合单元", "分辨率", "时长"]
+        fields = ["时间", "领取人", "oss链接", "视频时长", "桶", "桶的具体类目", "内部质检", "验收", "备注",
+                  "单元", "分辨率", "时长秒", "本地路径"]
         try:
             stream = output.open("w", encoding="utf-8-sig", newline="")
         except PermissionError:
@@ -846,17 +896,29 @@ class MediaPipeline:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output = output.with_name(f"QT寻源数据_交付信息表_{timestamp}.csv")
             stream = output.open("w", encoding="utf-8-sig", newline="")
+        units = getattr(self.rules, "units", None) or {}
+        owner = getattr(self.settings, "delivery_owner", "")
         with stream:
             writer = csv.DictWriter(stream, fieldnames=fields)
             writer.writeheader()
             for row in rows:
+                unit = str(row.get("delivery_unit") or row.get("unit") or "")
+                bucket = str(row.get("bucket") or unit.split(".", 1)[0])
+                filename = str(row.get("delivery_filename") or Path(str(row.get("final_path") or "")).name)
                 writer.writerow({
-                    "人称": "第一人称" if row["viewpoint"] == "first_person" else "第三人称",
-                    "OSS路径": "OSS",
-                    "交付时间": row.get("exported_at") or delivery_time,
-                    "统合单元": row["unit"],
-                    "分辨率": f"{row['width']}x{row['height']}",
-                    "时长": round(float(row["duration"] or 0), 3),
+                    "时间": str(row.get("exported_at") or delivery_time)[:10],
+                    "领取人": owner,
+                    "oss链接": self.oss_url_for(f"{bucket}/{filename}"),
+                    "视频时长": duration_label(row.get("duration")) or "",
+                    "桶": bucket,
+                    "桶的具体类目": (units.get(unit) or {}).get("name", ""),
+                    "内部质检": "",
+                    "验收": "",
+                    "备注": "",
+                    "单元": unit,
+                    "分辨率": f"{row.get('width')}x{row.get('height')}",
+                    "时长秒": round(float(row.get("duration") or 0), 3),
+                    "本地路径": row.get("final_path") or "",
                 })
         self.db.mark_delivery_exported([int(row["candidate_id"]) for row in rows], delivery_time)
         return output

@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS candidate_shots (
   candidate_viewpoint TEXT,
   material_type TEXT,
   duration_bucket TEXT,
+  delivery_description TEXT,
   score REAL NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'WAITING_REVIEW',
   representative_hash TEXT,
@@ -187,6 +188,9 @@ class Database:
                 con.execute("ALTER TABLE sources ADD COLUMN analysis_completed INTEGER NOT NULL DEFAULT 0")
                 con.execute("""UPDATE sources SET analysis_completed=1
                                WHERE EXISTS (SELECT 1 FROM candidate_shots c WHERE c.source_id=sources.id)""")
+            candidate_columns = {row[1] for row in con.execute("PRAGMA table_info(candidate_shots)")}
+            if "delivery_description" not in candidate_columns:
+                con.execute("ALTER TABLE candidate_shots ADD COLUMN delivery_description TEXT")
             final_columns = {row[1] for row in con.execute("PRAGMA table_info(final_clips)")}
             if "exported_at" not in final_columns:
                 con.execute("ALTER TABLE final_clips ADD COLUMN exported_at TEXT")
@@ -621,8 +625,13 @@ class Database:
                    VALUES(?,?,?,?,?,?,?,?)""",
                 (candidate_id, decision, payload.get("final_bucket"), payload.get("final_unit"), payload.get("final_viewpoint"),
                  payload.get("notes", ""), json.dumps(payload.get("manual_rule_overrides", {}), ensure_ascii=False), now()))
-            con.execute("UPDATE candidate_shots SET status=?,candidate_bucket=COALESCE(?,candidate_bucket),candidate_unit=COALESCE(?,candidate_unit),candidate_viewpoint=COALESCE(?,candidate_viewpoint) WHERE id=?",
-                        (new_status, payload.get("final_bucket"), payload.get("final_unit"), payload.get("final_viewpoint"), candidate_id))
+            con.execute("""UPDATE candidate_shots
+                           SET status=?,candidate_bucket=COALESCE(?,candidate_bucket),candidate_unit=COALESCE(?,candidate_unit),
+                               candidate_viewpoint=COALESCE(?,candidate_viewpoint),
+                               delivery_description=COALESCE(?,delivery_description)
+                           WHERE id=?""",
+                        (new_status, payload.get("final_bucket"), payload.get("final_unit"), payload.get("final_viewpoint"),
+                         str(payload.get("delivery_description") or "").strip() or None, candidate_id))
             return int(cur.lastrowid)
 
     def add_traffic(self, kind: str, byte_count: int, source_id: int | None = None, direction: str = "download") -> None:
@@ -705,7 +714,8 @@ class Database:
     def delivery_filename_rows(self) -> list[dict[str, Any]]:
         with self.connect() as con:
             rows = con.execute("""SELECT f.candidate_id,f.final_path,f.delivery_unit,f.delivery_sequence,
-                                  f.delivery_filename,f.deliverable_status,c.candidate_unit unit,s.title source_title
+                                  f.delivery_filename,f.deliverable_status,c.candidate_unit unit,
+                                  c.candidate_bucket bucket,c.delivery_description,s.title source_title
                                   FROM final_clips f
                                   JOIN candidate_shots c ON c.id=f.candidate_id
                                   JOIN sources s ON s.id=c.source_id
@@ -733,6 +743,7 @@ class Database:
         with self.connect() as con:
             rows = con.execute("""SELECT c.id candidate_id,c.candidate_bucket bucket,c.candidate_unit unit,
                 c.candidate_viewpoint viewpoint,c.start_time,c.end_time,c.duration candidate_duration,c.duration_bucket,
+                c.delivery_description,
                 s.url source_url,s.platform,s.video_id,s.title source_title,
                 f.final_path,f.delivery_unit,f.delivery_sequence,f.delivery_filename,
                 f.duration,f.width,f.height,f.fps,f.has_audio,f.qa_status,f.deliverable_status,

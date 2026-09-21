@@ -106,6 +106,7 @@ async function show() {
   fillUnits(current.candidate_unit || '');
   $('#viewpoint').value = current.candidate_viewpoint || '';
   $('#notes').value = '';
+  $('#description').value = current.delivery_description || '';
   renderTrim();
   renderRules(current.rules);
 }
@@ -193,7 +194,8 @@ async function decide(decision, confirmHard = false) {
     return;
   }
   const payload = {decision, final_bucket: $('#bucket').value || null, final_unit: $('#unit').value || null,
-    final_viewpoint: $('#viewpoint').value || null, notes: $('#notes').value,
+    final_viewpoint: $('#viewpoint').value || null, delivery_description: $('#description').value || null,
+    notes: $('#notes').value,
     manual_rule_overrides: {}, confirm_hard_fail: confirmHard};
   try {
     await api(`/api/candidates/${current.id}/review`, {method: 'POST', body: JSON.stringify(payload)});
