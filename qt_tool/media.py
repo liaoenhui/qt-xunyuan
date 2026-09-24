@@ -191,6 +191,81 @@ def source_live_reason(metadata: dict[str, Any]) -> str | None:
     return None
 
 
+# 标题命中即不入库。与 rules/search_templates.yaml 的 defaults.negative 合并使用。
+BUILTIN_NEGATIVE_TERMS = (
+    "cinematic", "b-roll", "broll", "walking tour", "4k walk", "pov", "gopro", "fpv", "insta360",
+    # 只挡头盔机位，不挡画面里戴头盔的工人/骑手
+    "helmet cam", "helmetcam", "helmet camera", "helmet view",
+    "onboard", "dashcam", "dash cam", "first person", "timelapse", "time lapse", "hyperlapse",
+    "slow motion", "slowmo", "how to", "tutorial", "vlog", "review", "compilation",
+    "montage", "shorts", "reaction", "gameplay",
+)
+# 单元级豁免：这些单元允许标题里出现对应词。
+NEGATIVE_EXEMPTIONS = {"T8.4": ("slow motion", "slowmo")}
+
+_CHANNEL_URL = re.compile(
+    r"^(?:https?://)?(?:www\.|m\.)?youtube\.com/(?P<path>@[\w.\-%]+|channel/[\w\-]+|c/[\w.\-%]+|user/[\w.\-%]+)"
+    r"(?P<tab>/[\w\-]*)?/?(?:[?#].*)?$", re.I)
+
+
+def _normalize_words(text: str) -> str:
+    return " ".join(re.sub(r"[-_#|/]+", " ", str(text or "").lower()).split())
+
+
+def load_negative_terms(templates_path: Path | str | None) -> list[str]:
+    """defaults.negative from search_templates.yaml (JSON syntax) merged with the built-in avoid list."""
+    terms: list[str] = []
+    if templates_path:
+        try:
+            data = json.loads(Path(templates_path).read_text(encoding="utf-8"))
+            terms.extend(str(t) for t in ((data.get("defaults") or {}).get("negative") or []) if str(t).strip())
+        except (OSError, ValueError, AttributeError):
+            pass
+    terms.extend(BUILTIN_NEGATIVE_TERMS)
+    seen: dict[str, None] = {}
+    for term in terms:
+        seen.setdefault(_normalize_words(term), None)
+    return [t for t in seen if t]
+
+
+def negative_terms_for(terms: list[str] | tuple[str, ...], target_unit: str | None) -> list[str]:
+    exempt = {_normalize_words(t) for t in NEGATIVE_EXEMPTIONS.get(str(target_unit or ""), ())}
+    return [t for t in terms if _normalize_words(t) not in exempt]
+
+
+def _term_in(normalized_text: str, term: str) -> bool:
+    word = _normalize_words(term)
+    return bool(word) and re.search(r"(?<![a-z0-9])" + re.escape(word), normalized_text) is not None
+
+
+def negative_hit(text: str, terms: list[str] | tuple[str, ...]) -> str | None:
+    """Return the first avoid-term found in ``text`` (case-insensitive, word-start match)."""
+    normalized = f" {_normalize_words(text)}"
+    return next((term for term in terms if _term_in(normalized, term)), None)
+
+
+def youtube_channel_url(url: str) -> str | None:
+    """Normalize a YouTube channel URL to its /videos tab; None when ``url`` is not a channel."""
+    match = _CHANNEL_URL.match(str(url or "").strip())
+    if not match:
+        return None
+    tab = (match.group("tab") or "").strip("/").lower()
+    if tab and tab not in {"videos", "featured"}:
+        return None
+    return f"https://www.youtube.com/{match.group('path')}/videos"
+
+
+def platform_of(item: dict[str, Any]) -> str:
+    """Flat 结果常缺 extractor_key，只有 ie_key 或 URL，也要认成 youtube。"""
+    extractor = str(item.get("extractor_key") or item.get("extractor") or item.get("ie_key") or "").lower()
+    url = str(item.get("webpage_url") or item.get("original_url") or item.get("url") or "").lower()
+    if "youtube" in extractor or re.match(r"^(?:https?://)?(?:[\w-]+\.)*(?:youtube\.com|youtu\.be)/", url):
+        return "youtube"
+    if "vimeo" in extractor or re.match(r"^(?:https?://)?(?:[\w-]+\.)*vimeo\.com/", url):
+        return "vimeo"
+    return extractor or "unknown"
+
+
 def merge_facts(base_json: str, probe: dict[str, Any], **overrides: Any) -> dict[str, Any]:
     facts = dict(json.loads(base_json or "{}"))
     facts.update(probe)
@@ -217,6 +292,35 @@ def po_token_server_alive(url: str) -> bool:
         return False
 
 
+DURATION_LABELS = {"short": "5-15S", "medium": "15-30S", "long": "30-60S"}
+
+
+def duration_label(seconds: float | None) -> str | None:
+    """Return the shared ledger duration tier, or None when it needs a human.
+
+    The ledger only accepts ``5-15S`` / ``15-30S`` / ``30-60S``. Anything the
+    rule book refuses to bucket on its own returns ``None`` so the cell stays
+    empty instead of carrying a guess: a missing duration, a clip under the
+    5 second minimum (R17), and the exact 15.0/30.0 tier boundaries that
+    CONFLICT-003 reserves for manual confirmation.
+    """
+    if seconds is None:
+        return None
+    try:
+        value = float(seconds)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value) or value < 5.0:
+        return None
+    if math.isclose(value, 15.0, abs_tol=0.001) or math.isclose(value, 30.0, abs_tol=0.001):
+        return None
+    if value < 15.0:
+        return DURATION_LABELS["short"]
+    if value < 30.0:
+        return DURATION_LABELS["medium"]
+    return DURATION_LABELS["long"]
+
+
 def tool_status(settings: Settings) -> dict[str, bool]:
     subject = SubjectContinuityAnalyzer(settings.root / "tools" / "models")
     return {
@@ -230,7 +334,8 @@ def tool_status(settings: Settings) -> dict[str, bool]:
     }
 
 
-def source_score(metadata: dict[str, Any], target_unit: str | None, query: str, gap_boost: float = 0) -> float:
+def source_score(metadata: dict[str, Any], target_unit: str | None, query: str, gap_boost: float = 0,
+                 negatives: list[str] | tuple[str, ...] | None = None) -> float:
     title = str(metadata.get("title", "")).lower()
     description = str(metadata.get("description", "")).lower()
     text = f"{title} {description}"
@@ -240,8 +345,9 @@ def source_score(metadata: dict[str, Any], target_unit: str | None, query: str, 
     quality = 20.0 if height >= 2160 else 14.0 if height >= 1440 else 7.0 if height >= 1080 else 0.0
     duration = float(metadata.get("duration") or 0)
     duration_score = 15.0 if duration >= 30 else 10.0 if duration >= 15 else 4.0 if duration >= 5 else -40.0
-    negatives = ("montage", "compilation", "gameplay", "shorts", "reaction")
-    penalty = sum(18.0 for word in negatives if word in text)
+    terms = negative_terms_for(BUILTIN_NEGATIVE_TERMS if negatives is None else negatives, target_unit)
+    normalized = f" {_normalize_words(text)}"
+    penalty = sum(18.0 for word in terms if _term_in(normalized, word))
     unit_bonus = 8.0 if target_unit else 0.0
     return max(0.0, min(100.0, 20 + relevance + quality + duration_score + unit_bonus + gap_boost - penalty))
 
@@ -265,7 +371,13 @@ class MediaPipeline:
             self.repair_delivery_filenames()
 
     def repair_delivery_filenames(self) -> int:
-        """Rename legacy deliverables and update their persisted standard names."""
+        """Move legacy deliverables into deliverable/CS/T{n}/ under the standard name.
+
+        The name contract (``T{桶}.{单元}_{序号3位}_{简述}.mp4``) is unchanged, so a
+        file that already complies keeps its name and is only relocated when it
+        still sits in an old folder. Anything outside the deliverable tree, or
+        whose bucket cannot be derived, is left untouched.
+        """
         root = (self.settings.data_dir / "deliverable").resolve()
         renamed = 0
         for row in self.db.delivery_filename_rows():
@@ -275,16 +387,20 @@ class MediaPipeline:
                 continue
             stored_name = str(row.get("delivery_filename") or "")
             compliant = re.fullmatch(rf"{re.escape(unit)}_{sequence:03d}_.+\.mp4", stored_name, re.IGNORECASE)
-            filename = stored_name if compliant else f"{unit}_{sequence:03d}_{delivery_description(row.get('source_title') or '')}.mp4"
+            description = delivery_description(row.get("delivery_description") or row.get("source_title") or "")
+            filename = stored_name if compliant else f"{unit}_{sequence:03d}_{description}.mp4"
+            bucket = str(row.get("bucket") or unit.split(".", 1)[0] or "")
             old_path = Path(str(row.get("final_path") or ""))
             final_path = old_path
             if old_path.is_file():
                 resolved = old_path.resolve()
                 if root == resolved.parent or root in resolved.parents:
-                    target = old_path.with_name(filename)
+                    target_dir = self.deliver_dir_for(bucket) if bucket and bucket != "UNSET" else old_path.parent
+                    target = target_dir / filename
                     if target != old_path:
                         if target.exists():
                             raise FileExistsError(f"交付文件名冲突：{target}")
+                        target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(old_path, target)
                         if target.stat().st_size != old_path.stat().st_size:
                             target.unlink(missing_ok=True)
@@ -325,18 +441,45 @@ class MediaPipeline:
         command.extend(args)
         return command
 
-    def discover(self, query: str, target_unit: str | None = None, limit: int = 10) -> dict[str, int]:
+    @property
+    def negative_terms(self) -> list[str]:
+        if getattr(self, "_negative_terms", None) is None:
+            self._negative_terms = load_negative_terms(getattr(self.settings, "search_templates_path", None))
+        return self._negative_terms
+
+    def discover(self, query: str, target_unit: str | None = None, limit: int = 10) -> dict[str, Any]:
+        """搜索入库；query 本身是 YouTube 频道 URL 时改为整拉频道。"""
+        if youtube_channel_url(query):
+            return self.discover_channel(query, target_unit, limit)
         if not _command_exists(self.settings.ytdlp_bin):
             raise ToolMissing("未找到 yt-dlp；安装后才能自动搜索公开来源，也可先手工导入 URL。")
         target = f"ytsearch{max(1, min(limit, 50))}:{query}"
-        proc = _run(self._ytdlp("--dump-single-json", "--flat-playlist", "--skip-download",
-                                "--ignore-errors", "--no-warnings", target), timeout=300)
+        return self._ingest_listing(["--dump-single-json", "--flat-playlist", "--skip-download",
+                                     "--ignore-errors", "--no-warnings", target], query, query, target_unit, "搜索")
+
+    def discover_channel(self, url: str, target_unit: str | None = None, limit: int = 60) -> dict[str, Any]:
+        """Flat-list a channel's uploads and ingest them with the same negative/duration/live filters."""
+        channel = youtube_channel_url(url)
+        if not channel:
+            raise ValueError(f"不是 YouTube 频道地址：{url}（应形如 https://www.youtube.com/@handle/videos）")
+        if not _command_exists(self.settings.ytdlp_bin):
+            raise ToolMissing("未找到 yt-dlp；安装后才能拉取频道。")
+        args = ["--dump-single-json", "--flat-playlist", "--skip-download", "--ignore-errors", "--no-warnings",
+                "--playlist-end", str(max(1, limit)), channel]
+        stats = self._ingest_listing(args, f"channel:{channel}", "", target_unit, "频道拉取")
+        stats["channel"] = channel
+        return stats
+
+    def _ingest_listing(self, ytdlp_args: list[str], search_label: str, score_query: str,
+                        target_unit: str | None, action: str) -> dict[str, Any]:
+        proc = _run(self._ytdlp(*ytdlp_args), timeout=300)
         if proc.returncode != 0:
-            raise RuntimeError(ytdlp_error_message(proc.stderr, "搜索"))
+            raise RuntimeError(ytdlp_error_message(proc.stderr, action))
         payload = json.loads(proc.stdout)
         self.db.add_traffic("metadata", len(proc.stdout.encode("utf-8")))
         entries = payload.get("entries") or []
-        found = created = excluded = excluded_live = 0
+        terms = negative_terms_for(self.negative_terms, target_unit)
+        found = created = excluded = excluded_live = filtered = 0
         for entry in entries:
             if not entry:
                 continue
@@ -344,7 +487,10 @@ class MediaPipeline:
             url = entry.get("webpage_url") or entry.get("url")
             if not url:
                 continue
-            metadata = self._normalize_ytdlp(entry, query, target_unit)
+            if negative_hit(str(entry.get("title") or ""), terms):
+                filtered += 1
+                continue
+            metadata = self._normalize_ytdlp(entry, search_label, target_unit, score_query=score_query)
             if source_live_reason(metadata.get("metadata") or metadata):
                 excluded += 1
                 excluded_live += 1
@@ -354,8 +500,8 @@ class MediaPipeline:
                 continue
             _, is_new = self.db.add_source(metadata)
             created += int(is_new)
-        return {"found": found, "created": created, "excluded": excluded, "excluded_live": excluded_live,
-                "max_duration_seconds": self.settings.source_max_duration_seconds}
+        return {"found": found, "created": created, "filtered": filtered, "excluded": excluded,
+                "excluded_live": excluded_live, "max_duration_seconds": self.settings.source_max_duration_seconds}
 
     def import_url(self, url: str, target_unit: str | None = None) -> tuple[int, bool]:
         if _command_exists(self.settings.ytdlp_bin):
@@ -371,9 +517,9 @@ class MediaPipeline:
         return self.db.add_source({"platform": platform, "video_id": video_id, "url": url, "title": url,
                                    "target_unit": target_unit, "status": "DISCOVERED"})
 
-    def _normalize_ytdlp(self, item: dict[str, Any], query: str, target_unit: str | None) -> dict[str, Any]:
-        extractor = str(item.get("extractor_key") or item.get("extractor") or "unknown").lower()
-        platform = "youtube" if "youtube" in extractor else "vimeo" if "vimeo" in extractor else extractor
+    def _normalize_ytdlp(self, item: dict[str, Any], query: str, target_unit: str | None,
+                         score_query: str | None = None) -> dict[str, Any]:
+        platform = platform_of(item)
         formats = [{k: f.get(k) for k in ("format_id", "ext", "width", "height", "fps", "filesize", "vcodec", "acodec")}
                    for f in (item.get("formats") or [])]
         raw_url = item.get("webpage_url") or item.get("original_url") or item.get("url")
@@ -395,7 +541,8 @@ class MediaPipeline:
             "metadata": item,
             "status": "METADATA_READY",
         }
-        result["source_score"] = source_score(item, target_unit, query)
+        result["source_score"] = source_score(item, target_unit, query if score_query is None else score_query,
+                                              negatives=self.negative_terms)
         return result
 
     def validate_proxy_source(self, source_id: int) -> dict[str, Any]:
@@ -837,6 +984,17 @@ class MediaPipeline:
             raise RuntimeError(proc.stderr[-2000:] or "最终剪片失败")
         return output
 
+    def deliver_dir_for(self, bucket: str) -> Path:
+        """Mirror the official OSS layout locally: deliverable/CS/T{n}/."""
+        return self.settings.data_dir / "deliverable" / "CS" / (bucket or "UNSET")
+
+    def oss_url_for(self, relative_path: str | Path) -> str:
+        """Build the official OSS URL for a path relative to the CS prefix."""
+        oss_bucket = getattr(self.settings, "oss_bucket", "futurelab-game-hz")
+        prefix = str(getattr(self.settings, "oss_prefix", "game_data/QT寻源全包供应商正式作业/CS")).strip("/")
+        relative = str(relative_path).replace("\\", "/").strip("/")
+        return f"oss://{oss_bucket}/{prefix}/{relative}" if prefix else f"oss://{oss_bucket}/{relative}"
+
     def final_qa_and_deliver(self, candidate_id: int) -> dict[str, Any]:
         with self._final_lock_guard:
             lock = self._final_candidate_locks.setdefault(candidate_id, Lock())
@@ -851,8 +1009,8 @@ class MediaPipeline:
         candidate = self.db.get_candidate(candidate_id)
         if not candidate:
             raise KeyError("候选不存在")
-        if not candidate.get("candidate_bucket") or not candidate.get("candidate_unit") or candidate.get("candidate_viewpoint") not in {"first_person", "third_person"}:
-            raise ValueError("最终处理前必须由人工确认桶、单元和人称")
+        if not candidate.get("candidate_bucket") or not candidate.get("candidate_unit"):
+            raise ValueError("最终处理前必须由人工确认桶和单元")
         original = self.download_final(int(candidate["source_id"]))
         candidate = self.db.get_candidate(candidate_id) or candidate
         source_info = self.probe(original)
@@ -911,13 +1069,10 @@ class MediaPipeline:
         if qa_status == "PASS":
             bucket = candidate.get("candidate_bucket") or "UNSET"
             unit = candidate.get("candidate_unit") or "UNSET"
-            bucket_name = self.rules.buckets.get(bucket, {}).get("name", "未分类")
-            viewpoint = "第一人称" if candidate.get("candidate_viewpoint") == "first_person" else "第三人称"
-            deliver_dir = self.settings.data_dir / "deliverable" / "QT寻源数据" / f"{bucket}_{bucket_name}" / viewpoint
+            deliver_dir = self.deliver_dir_for(bucket)
             deliver_dir.mkdir(parents=True, exist_ok=True)
-            assignment = self.db.reserve_delivery_filename(
-                candidate_id, unit, delivery_description(candidate.get("source_title") or "")
-            )
+            description = delivery_description(candidate.get("delivery_description") or candidate.get("source_title") or "")
+            assignment = self.db.reserve_delivery_filename(candidate_id, unit, description)
             final_path = deliver_dir / assignment["filename"]
             shutil.copy2(clip, final_path)
             self.db.update_final_clip_delivery(candidate_id, str(final_path), assignment["filename"], "READY")
@@ -929,10 +1084,13 @@ class MediaPipeline:
                 "rules": [r.to_dict() for r in results]}
 
     def export_delivery_csv(self) -> Path:
+        """Export the shared ledger (Sheet1) columns plus local cross-check columns."""
         rows = self.db.delivery_rows()
-        delivery_time = datetime.now(UTC).isoformat()
+        export_time = datetime.now(UTC)
+        delivery_time = export_time.isoformat()
         output = self.settings.data_dir / "deliverable" / "QT寻源数据_交付信息表.csv"
-        fields = ["人称", "OSS路径", "交付时间", "统合单元", "分辨率", "时长"]
+        fields = ["时间", "领取人", "oss链接", "视频时长", "桶", "桶的具体类目", "内部质检", "验收", "备注",
+                  "单元", "分辨率", "时长秒", "本地路径"]
         try:
             stream = output.open("w", encoding="utf-8-sig", newline="")
         except PermissionError:
@@ -941,17 +1099,29 @@ class MediaPipeline:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output = output.with_name(f"QT寻源数据_交付信息表_{timestamp}.csv")
             stream = output.open("w", encoding="utf-8-sig", newline="")
+        units = getattr(self.rules, "units", None) or {}
+        owner = getattr(self.settings, "delivery_owner", "")
         with stream:
             writer = csv.DictWriter(stream, fieldnames=fields)
             writer.writeheader()
             for row in rows:
+                unit = str(row.get("delivery_unit") or row.get("unit") or "")
+                bucket = str(row.get("bucket") or unit.split(".", 1)[0])
+                filename = str(row.get("delivery_filename") or Path(str(row.get("final_path") or "")).name)
                 writer.writerow({
-                    "人称": "第一人称" if row["viewpoint"] == "first_person" else "第三人称",
-                    "OSS路径": "OSS",
-                    "交付时间": row.get("exported_at") or delivery_time,
-                    "统合单元": row["unit"],
-                    "分辨率": f"{row['width']}x{row['height']}",
-                    "时长": round(float(row["duration"] or 0), 3),
+                    "时间": str(row.get("exported_at") or delivery_time)[:10],
+                    "领取人": owner,
+                    "oss链接": self.oss_url_for(f"{bucket}/{filename}"),
+                    "视频时长": duration_label(row.get("duration")) or "",
+                    "桶": bucket,
+                    "桶的具体类目": (units.get(unit) or {}).get("name", ""),
+                    "内部质检": "",
+                    "验收": "",
+                    "备注": "",
+                    "单元": unit,
+                    "分辨率": f"{row.get('width')}x{row.get('height')}",
+                    "时长秒": round(float(row.get("duration") or 0), 3),
+                    "本地路径": row.get("final_path") or "",
                 })
         self.db.mark_delivery_exported([int(row["candidate_id"]) for row in rows], delivery_time)
         return output

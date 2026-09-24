@@ -6,10 +6,12 @@
   <main class="page"><div class="review-layout">
     <section class="card"><div class="video-wrap"><video id="video" controls preload="metadata"></video><div class="empty" id="video-empty">暂无待审核候选</div></div><div class="clip-meta"><span id="source-meta">—</span><span id="clip-time">—</span></div></section>
     <aside class="card review-sidebar">
-      <div class="section-head"><div><h2 id="candidate-title">候选判断</h2><p id="queue-meta">载入中…</p></div><div class="list-controls"><select id="review-bucket-filter" aria-label="审核分类"></select></div></div>
-      <div class="recommend"><div><label>桶</label><select id="bucket"></select></div><div><label>单元</label><select id="unit"></select></div><div><label>人称</label><select id="viewpoint"><option value="">待人工判断</option><option value="first_person">第一人称</option><option value="third_person">第三人称</option></select></div></div>
+      <div class="section-head"><div><h2 id="candidate-title">候选判断</h2><p id="queue-meta">载入中…</p></div><div class="list-controls"><select id="review-bucket-filter" aria-label="审核分类"></select><select id="review-unit-filter" aria-label="审核单元"></select></div></div>
+      <div class="recommend"><div><label>桶</label><select id="bucket"></select></div><div><label>单元</label><select id="unit"></select></div></div>
+      <input id="description" type="text" maxlength="40" placeholder="交付文件简述（如 液体界面移动；留空则用来源标题）">
       <div class="review-scroll" tabindex="0" aria-label="审核详情，可滚动">
       <textarea id="notes" rows="2" placeholder="拒绝原因、if→then、物理反馈等备注"></textarea>
+      <div class="source-reject"><button class="secondary" id="reject-source">打回本来源全部待审候选</button><span id="source-reject-meta"></span></div>
       <details class="trim-panel" id="camera-panel">
         <summary class="trim-head"><strong>运镜预筛</strong><span id="camera-status" class="badge unknown">尚未检测</span></summary>
         <p>主体动作≠运镜；轻微抖动不算，变焦不合格。本检测只提示，不自动淘汰、裁剪或认定合格。</p>

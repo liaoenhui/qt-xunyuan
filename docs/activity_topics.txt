@@ -84,6 +84,13 @@
 移动中操纵悬浮物|telekinesis walking movie scene|人物位移与物体响应同时成立，非纯追逐。
 科幻短片智能房间|smart room sci fi short film|真人走动触发房间变化，不是现实家居开关演示。
 @T3.1|先试|只找外部跟拍的人与动物或双人互动，锚定发起者。接近→接触→持续→分开完整且对象有回应；第三人称不等于固定旁观，原文排除固定旁观机位。
+跟拍马匹梳毛|"tracking shot of" groomer brushing horse|图库单镜头：外部跟拍，人和动物同框，接触动作完整。
+宠物洗澡实录|dog groomer bathing dog natural sound|图库单镜头：外部跟拍，人和动物同框，接触动作完整。
+农夫喂羊跟拍|farmer feeding goats "following shot"|图库单镜头：外部跟拍，人和动物同框，接触动作完整。
+推轨抚摸马匹|"dolly shot of" woman petting horse|图库单镜头：外部跟拍，人和动物同框，接触动作完整。
+主人逗狗无解说|owner playing with dog no talking|图库单镜头：外部跟拍，人和动物同框，接触动作完整。
+饲养员喂大象|keeper feeding elephant real sound|图库单镜头：外部跟拍，人和动物同框，接触动作完整。
+重逢拥抱一镜到底|couple hugging reunion one take|图库单镜头：外部跟拍，人和动物同框，接触动作完整。
 宠物美容师给狗梳毛|dog groomer brushing dog|侧面跟随美容师的操作，操作者、手、狗的回应及结束都可见。
 马厩日常刷马|groom brushing horse|外部拍摄马工接近、刷毛到撤手，马转头或调整身体回应。
 主人抚摸猫咪|owner petting cat|主人身体与猫同框，猫蹭手或转头回应，不能开头已经接触。
@@ -104,6 +111,13 @@
 教练向运动员交代战术|coach athlete conversation|两人站定面对面，教练手势与运动员回应连续，不选围坐会议。
 裁缝与顾客面谈|tailor customer consultation|双方站立讨论版型并回应，重点是朝向和手势而非各自独立干活。
 @T3.3|先试|同伴身体可见，行走中有等待、放慢、侧头交流或间距调整。只拍脚与路应转查T6。
+背影情侣遛狗|"back view of" couple walking dog|图库单镜头：背后或侧面跟拍两人同行，两人全程可见。
+跟拍朋友边走边聊|"tracking shot of" two friends walking talking|图库单镜头：背后或侧面跟拍两人同行，两人全程可见。
+公园情侣跟拍|"following shot of" couple walking in park|图库单镜头：背后或侧面跟拍两人同行，两人全程可见。
+母女同行移动镜头|"traveling shot of" mother and daughter walking|图库单镜头：背后或侧面跟拍两人同行，两人全程可见。
+稳定器跟拍徒步二人|"steadicam shot of" two hikers on trail|图库单镜头：背后或侧面跟拍两人同行，两人全程可见。
+老夫妻散步一镜到底|elderly couple walking together one take|图库单镜头：背后或侧面跟拍两人同行，两人全程可见。
+街头同行实录|two friends walking street natural sound|图库单镜头：背后或侧面跟拍两人同行，两人全程可见。
 双人山路徒步|two friends hiking together|第三位摄影者跟随两人，能看出等候、回头交流或步速匹配。
 双人边走边聊|walking and talking one take|两人持续同行，动态速度匹配可读。
 向导带游客徒步|hiking guide with visitors|向导与游客均可见，放慢等人或边走指路，不能只拍摄影者前方的路。
@@ -113,6 +127,13 @@
 结伴遛狗散步|couple walking dog together|两人边走边呼应并调整间距，狗不能替代双人的同行关系。
 护工陪长者步行|caregiver walking with elderly person|双方身体可见，搀扶行走、配合步速到站稳连续。
 @T3.4|先试|一方行动、另一方明确回应，触发→过程→反馈同镜头；合作关系比单纯同时出现更重要。
+跟拍两人抬桌|"tracking shot of" two people carrying table|图库单镜头：外部跟拍两人协作，配合动作起止完整。
+两人抬皮划艇|two men carrying kayak "following shot"|图库单镜头：外部跟拍两人协作，配合动作起止完整。
+推轨两人搭帐篷|"dolly shot of" couple pitching tent|图库单镜头：外部跟拍两人协作，配合动作起止完整。
+两工人抬梯子|two workers carrying ladder no talking|图库单镜头：外部跟拍两人协作，配合动作起止完整。
+父子传接球一镜到底|father and son playing catch one take|图库单镜头：外部跟拍两人协作，配合动作起止完整。
+稳定器两人搬家具|"steadicam shot of" two people moving furniture|图库单镜头：外部跟拍两人协作，配合动作起止完整。
+朋友攀岩互助实录|friends helping climb rock natural sound|图库单镜头：外部跟拍两人协作，配合动作起止完整。
 双人传接球|two people playing catch|外部摄影看见投球者和接球者，抛球到接稳同镜头完整。
 同伴拉上岩台|helping friend climb|伸手、握住、拉起和站稳完整。
 双人搬桌子|two people moving table|能看出双方配合移动及放稳结果。
@@ -138,6 +159,14 @@
 徒步者停步喝水|hiker drinking water|外部拍摄取出水瓶、饮水、收回完整，不能只拍伸向镜头的瓶子。
 人物图书馆阅读|student reading library|人物与书页动作连续，阅读中有实际手部操作，不是静态学习直播。
 @T4.2|先试|优先找厨师、工匠、清洁工的职业活动，外部镜头能辨明操作者及手与物体关系。手接触→状态改变→结果完整；顶拍手部不直接当第三人称，加速教程和前后跳切不收。
+推轨厨师切菜|"dolly shot of" chef chopping vegetables|图库单镜头：侧拍职业操作者，手与物体关系可见，无快放跳切。
+面包师揉面实录|baker kneading dough natural sound|图库单镜头：侧拍职业操作者，手与物体关系可见，无快放跳切。
+拉面师傅现场声|noodle master hand pulled noodles real sound|图库单镜头：侧拍职业操作者，手与物体关系可见，无快放跳切。
+裁缝手缝无解说|tailor hand sewing no talking|图库单镜头：侧拍职业操作者，手与物体关系可见，无快放跳切。
+跟拍木匠刨木|"tracking shot of" carpenter planing wood|图库单镜头：侧拍职业操作者，手与物体关系可见，无快放跳切。
+书法一镜到底|calligrapher brush writing single take|图库单镜头：侧拍职业操作者，手与物体关系可见，无快放跳切。
+擦窗工素材|window cleaner squeegee raw footage|图库单镜头：侧拍职业操作者，手与物体关系可见，无快放跳切。
+推轨街头摊贩烹饪|"dolly shot of" street food vendor cooking|图库单镜头：侧拍职业操作者，手与物体关系可见，无快放跳切。
 厨师切菜备料|chef chopping vegetables|侧拍厨师及刀和菜，保留一次完整切分，不只选刀刃特写。
 面包师揉面|baker kneading dough|面包师施力到面团形变完整，排除快放和只拍面团。
 厨师打蛋搅拌|chef whisking eggs|操作者手臂与碗同框，从搅拌到混合结果可见。
@@ -153,6 +182,13 @@
 皮匠手工缝皮|leatherworker stitching leather|操作者与双手拉线同框，从穿孔到收紧完整。
 厨师炒锅翻炒|chef wok cooking|侧拍厨师翻炒令食材变化，火焰不过曝，不是广告快剪。
 @T4.3|先试|侧面跟随服务员、店员、工匠的拿放收纳，必须可辨操作者。只改变位置；改变性质形状优先查T4.2。别用第一视角整理或纯桌面顶拍替代。
+推轨服务员摆台|"dolly shot of" waiter setting table|图库单镜头：外部拍摄摆放整理，操作者与物品同框。
+跟拍图书管理员上架|"tracking shot of" librarian shelving books|图库单镜头：外部拍摄摆放整理，操作者与物品同框。
+服务员上菜实录|waiter serving plates restaurant natural sound|图库单镜头：外部拍摄摆放整理，操作者与物品同框。
+花艺师插花无解说|florist arranging flowers no talking|图库单镜头：外部拍摄摆放整理，操作者与物品同框。
+店员补货素材|shopkeeper stocking shelves raw footage|图库单镜头：外部拍摄摆放整理，操作者与物品同框。
+跟拍服务员端托盘|"following shot of" waiter carrying tray|图库单镜头：外部拍摄摆放整理，操作者与物品同框。
+茶艺斟茶一镜到底|tea master pouring tea one take|图库单镜头：外部拍摄摆放整理，操作者与物品同框。
 服务员摆餐具|waiter setting table|外部拍人拿餐具到放稳，保留操作者与桌面关系。
 技师整理工具箱|mechanic organizing toolbox|技师身体与拿放动作可辨，工具归位连续，不选延时清理。
 图书管理员上架|librarian shelving books|跟随管理员取书、移位到放入书架完整。
@@ -164,6 +200,13 @@
 花店店员摆放花束|florist arranging bouquets display|店员把现成花束搬到展示位，改变位置而非剪枝制作。
 面包师摆盘上架|baker arranging bread tray|人拿成品面包到放稳，保留手与托盘，不选制作面团。
 @T4.4|补充|第三位摄影者跟随操作者开合；整批每类仍需开和关。优先厨房实操、家具演示和仓库作业中的完整动作，不能只拍机构或静态对镜讲解；穿门探索归T6.4。
+跟拍开门|"following shot of" man opening door|图库单镜头：外部拍摄开关门窗柜，人与门体同框，开合完整。
+背影开门进屋|"back view of" woman opening door entering room|图库单镜头：外部拍摄开关门窗柜，人与门体同框，开合完整。
+推轨厨师开冰箱|"dolly shot of" chef opening refrigerator|图库单镜头：外部拍摄开关门窗柜，人与门体同框，开合完整。
+司机开车门素材|driver opening car door raw footage|图库单镜头：外部拍摄开关门窗柜，人与门体同框，开合完整。
+卷帘门现场声|worker opening roller shutter real sound|图库单镜头：外部拍摄开关门窗柜，人与门体同框，开合完整。
+开窗一镜到底|woman opening window single take|图库单镜头：外部拍摄开关门窗柜，人与门体同框，开合完整。
+跟拍开柜门|"tracking shot of" person opening cabinet|图库单镜头：外部拍摄开关门窗柜，人与门体同框，开合完整。
 厨师开关冰箱|chef opening refrigerator|侧拍厨师握把手到打开或关严，保留人、手、门板。
 木工演示抽屉开合|cabinetmaker drawer demonstration|外部拍木工推拉到行程终点，不选只有抽屉的产品展示。
 人物打开窗扇|person opening casement window|侧拍人握把手、旋转、推开，另选完整关闭动作补双向。
@@ -180,6 +223,13 @@
 列车驶出隧道外拍|train emerging from tunnel|镜头跟随同一列车驶出并进入新环境，排除司机室和固定监控。
 船只出港外拍|boat leaving harbor exterior|从相邻船平视跟拍目标船，由港池到开放水域，不能只看船头前方。
 @T5.2|难搜|本单元强制第三人称，至少事件两个变化阶段；不要强塞人物，锚定明确事件并核对R11，避免固定监控与POV涉险。
+跟拍浪打礁石|"tracking shot of" waves crashing on rocks|图库单镜头：自然力作用过程连续，实时速度，无剪辑。
+风暴浪打防波堤素材|storm waves hitting breakwater raw footage|图库单镜头：自然力作用过程连续，实时速度，无剪辑。
+瀑布近景实录|waterfall close up natural sound|图库单镜头：自然力作用过程连续，实时速度，无剪辑。
+涌潮移动镜头|tidal bore wave "traveling shot"|图库单镜头：自然力作用过程连续，实时速度，无剪辑。
+大风摇树现场声|trees swaying strong wind real sound|图库单镜头：自然力作用过程连续，实时速度，无剪辑。
+火山喷发素材|volcano lava eruption raw footage|图库单镜头：自然力作用过程连续，实时速度，无剪辑。
+雪崩图库素材|avalanche falling mountain stock footage|图库单镜头：自然力作用过程连续，实时速度，无剪辑。
 巨浪冲击防波堤|wave hitting breakwater|浪接近、撞击、扩散消退至少两个阶段。
 潮涌推进|tidal bore approaching|锚定同一波前，看增强与传播，非纯远景空镜。
 瀑布洪峰到来|waterfall surge|水流由弱到强或扩散可辨，非恒定瀑布壁纸。
@@ -194,6 +244,13 @@
 舞狮配合表演|lion dance full performance|明确团队共同控制动作，原声可闻。
 牧羊犬与训犬员表演|dog handler agility demonstration|人与动物明确配合，不是动物单独跑动。
 @T5.4|补充|强制第三人称旁观；载具进入→经过→驶离完整。与R11结合时跟随明确车辆或群体，避免固定监控。
+跟拍电车过街|"tracking shot of" tram passing street|图库单镜头：外部拍摄载具经过或进出，全程可见。
+列车过道口现场声|train passing level crossing real sound|图库单镜头：外部拍摄载具经过或进出，全程可见。
+渡轮进港移动镜头|"traveling shot of" ferry arriving port|图库单镜头：外部拍摄载具经过或进出，全程可见。
+山路汽车外部跟拍|car driving mountain road tracking shot|图库单镜头：外部拍摄载具经过或进出，全程可见。
+飞机滑行素材|aircraft taxiing runway raw footage|图库单镜头：外部拍摄载具经过或进出，全程可见。
+拖船顶船图库|tugboat pushing ship harbor stock footage|图库单镜头：外部拍摄载具经过或进出，全程可见。
+公交进站一镜到底|bus arriving bus stop one take|图库单镜头：外部拍摄载具经过或进出，全程可见。
 电车通过街道路口|tram passing intersection|追随同一电车通过路口，周边交通可读。
 铁路道口列车经过|train passing level crossing|进入、通过与驶离连续，不选远景静机监控。
 渡轮进出港|ferry arriving harbor|载具路线、码头关系明确，地面视角。
@@ -257,6 +314,13 @@
 沉浸式展览导览|immersive exhibition guided tour|跟随向导，环境有动态与明暗变化并含回访。
 演员带领奇幻场景导览|fantasy set tour with host|外部跟拍向导走过不同光照空间并回访，不选乘坐者视野或纯布景空镜。
 @T6.6|先试|跟随人物走街道、公园或校园，同时保留环视或二次回访。普通无同伴步行片多为第一人称。
+跟拍导游带团|"following shot of" tourists walking with guide|图库单镜头：外部跟随人物穿行室外空间，路线连续。
+背影导游领队|"back view of" guide leading group|图库单镜头：外部跟随人物穿行室外空间，路线连续。
+跟拍公园行人|"tracking shot of" people walking through park|图库单镜头：外部跟随人物穿行室外空间，路线连续。
+稳定器家庭逛花园|"steadicam shot of" family walking in garden|图库单镜头：外部跟随人物穿行室外空间，路线连续。
+村路徒步移动镜头|"traveling shot of" hikers walking village path|图库单镜头：外部跟随人物穿行室外空间，路线连续。
+老城导览一镜到底|tour guide walking group old town one take|图库单镜头：外部跟随人物穿行室外空间，路线连续。
+跟拍情侣逛集市|"following shot of" couple exploring market|图库单镜头：外部跟随人物穿行室外空间，路线连续。
 校园向导步行|campus tour student guide|跟随学生向导移动，回到同一地标或环视。
 公园步行带路|park guided walk|人物始终可见，路线有回访而非只直走。
 街区实地导览|neighborhood guided walk|跟随向导过街与人行道切换，查连续性。
@@ -264,6 +328,13 @@
 植物园人物导览|botanical garden guided tour|人和背景都清楚，有活性对象与环视回访。
 山村街道同行|village walk with guide|人物移动和环境关系清楚，不是风景幻灯片。
 @T6.7|先试|第三人称跟随带看人，优先可回到同一房间的路线；俯拍房产无人机和无人空镜不等于人物探索。
+稳定器跟拍穿过办公室|"steadicam shot of" woman walking through office|图库单镜头：外部跟随人物穿行室内空间，房间转换连续。
+跟拍穿过住宅|"following shot of" man walking through house|图库单镜头：外部跟随人物穿行室内空间，房间转换连续。
+跟拍厨师穿过后厨|"tracking shot of" chef walking through kitchen|图库单镜头：外部跟随人物穿行室内空间，房间转换连续。
+背影参观博物馆|"back view of" visitor walking through museum|图库单镜头：外部跟随人物穿行室内空间，房间转换连续。
+稳定器酒店走廊|"steadicam shot of" hotel corridor walking|图库单镜头：外部跟随人物穿行室内空间，房间转换连续。
+艺术家工作室一镜到底|artist walking through studio one take|图库单镜头：外部跟随人物穿行室内空间，房间转换连续。
+工厂车间行走素材|worker walking through factory floor raw footage|图库单镜头：外部跟随人物穿行室内空间，房间转换连续。
 办公室现场导览|office tour one take|跟随讲解者走动，环视或回到工作区。
 工坊现场参观|workshop tour one take|人物穿行多个位置后回访，原声与背景清楚。
 画室带看|artist studio walkthrough|艺术家本人持续可见，不是作品特写拼接。
@@ -271,6 +342,13 @@
 家庭室内参观|home tour one take|带看人身体可见并有环视回访，不选快剪装潢展示。
 博物馆室内导览|museum guided walkthrough|跟随向导，展区关系连续，避免纯静态展品。
 @T6.8|先试|豁免环视回访与R13；外部跟随人物完成上下位移，不能拿纯电梯内壁或摄影者脚步替代主体。
+跟拍男子上楼|"following shot of" man walking up stairs|图库单镜头：外部跟随人物上下楼、扶梯或电梯，全程可见。
+扶梯跟拍图库|escalator following shot stock|图库单镜头：外部跟随人物上下楼、扶梯或电梯，全程可见。
+背影女子下楼|"back view of" woman walking downstairs|图库单镜头：外部跟随人物上下楼、扶梯或电梯，全程可见。
+跟拍爬楼梯|"tracking shot of" person climbing stairs|图库单镜头：外部跟随人物上下楼、扶梯或电梯，全程可见。
+跟拍进电梯|"following shot of" woman entering elevator|图库单镜头：外部跟随人物上下楼、扶梯或电梯，全程可见。
+稳定器旋转楼梯|"steadicam shot of" person walking up spiral staircase|图库单镜头：外部跟随人物上下楼、扶梯或电梯，全程可见。
+商务人士乘扶梯|businessman riding escalator stock footage|图库单镜头：外部跟随人物上下楼、扶梯或电梯，全程可见。
 人物上楼跟拍|walking upstairs follow cam|从接近台阶到上楼站稳连续，主体全程可见。
 人物下楼跟拍|walking downstairs tracking shot|下楼过程完整，避免只拍脚。
 跟随人物上扶梯|following person escalator|踏入、上升、走出完整。
@@ -299,6 +377,13 @@
 投沙包入板|cornhole throw|抛掷者与落点同框，保留完整抛物过程。
 推箱子滑动|pushing heavy box|施力者、物体位移和停止可见，非单纯搬家记录。
 @T7.3|先试|看施力主体或明确受力过程，形变破坏是主看点。金属锻打等易搜但常有慢放、火花特写和音乐覆盖。
+推轨铁匠锻打|"dolly shot of" blacksmith forging|图库单镜头：侧拍施力到形变完整，操作者可见，实时速度。
+劈柴实录|lumberjack splitting firewood natural sound|图库单镜头：侧拍施力到形变完整，操作者可见，实时速度。
+拉坯素材|potter throwing clay pottery wheel raw footage|图库单镜头：侧拍施力到形变完整，操作者可见，实时速度。
+弯管现场声|worker bending metal pipe real sound|图库单镜头：侧拍施力到形变完整，操作者可见，实时速度。
+跟拍挖掘机拆墙|"tracking shot of" excavator demolishing wall|图库单镜头：侧拍施力到形变完整，操作者可见，实时速度。
+斧劈木头一镜到底|man chopping wood with axe single take|图库单镜头：侧拍施力到形变完整，操作者可见，实时速度。
+推轨吹玻璃|"dolly shot of" glassblower shaping glass|图库单镜头：侧拍施力到形变完整，操作者可见，实时速度。
 锻工手锤锻打|blacksmith hand forging|锻工与锤击导致金属形变同框，实时连续。
 劈柴|splitting firewood|举斧、接触、木头裂开完整，不能只拍飞溅碎片。
 陶艺拉坯|pottery wheel throwing real time|操作者双手与泥坯形变同时可见，非延时。
@@ -308,6 +393,13 @@
 揉捏黏土|clay kneading real time|操作者与材料形变，物理形变比制作成品更突出。
 弹性垫受压回弹|jumping on trampoline ground view|人体施力和垫面变形回弹同时可见。
 @T7.4|补充|本单元无需人为主体，可锚定水流或火焰本身；自发现象必须有清晰变化，排除纯装饰循环、模拟与延时。
+浪冲沙堡图库|waves washing away sandcastle stock footage|图库单镜头：流体或自然作用改变物体，过程连续，实时速度。
+熔岩流近景素材|lava flow close up raw footage|图库单镜头：流体或自然作用改变物体，过程连续，实时速度。
+溪水绕石实录|stream flowing over rocks natural sound|图库单镜头：流体或自然作用改变物体，过程连续，实时速度。
+火势蔓延现场声|fire spreading grass real sound|图库单镜头：流体或自然作用改变物体，过程连续，实时速度。
+跟拍河水流动|"tracking shot of" river flowing|图库单镜头：流体或自然作用改变物体，过程连续，实时速度。
+雨打沙面图库|rain on sand close up stock footage|图库单镜头：流体或自然作用改变物体，过程连续，实时速度。
+冰融滴水素材|melting ice dripping raw footage|图库单镜头：流体或自然作用改变物体，过程连续，实时速度。
 雨水冲走泥沙|rain washing away sand|锚定水流与泥沙迁移，能看见清洁过程。
 海浪冲刷沙堆|wave washing sandcastle|水冲到沙体并侵蚀的因果过程清楚。
 水流绕石形成涡旋|stream flowing around rock|锚定具体水流结构，变化可辨而非风景空镜。
@@ -322,6 +414,14 @@
 自行车下台阶|bike riding down stairs|全车及骑手随地形起伏，避免剪辑炫技。
 马匹走崎岖山路|horse rocky trail|动物全身与落蹄地形同时可辨。
 @T7.6|先试|只选外部拍摄，涉水主体与入水出水、飞溅或水面破开同时可见；旧版第一人称踩水坑方向停用，不能只拍摄影者的脚或水纹。
+孩子踩水坑图库|kids splashing puddles stock footage|图库单镜头：外部拍摄人/动物/载具入水或涉水，水花全程可见。
+马过河跟拍|horse crossing river "tracking shot"|图库单镜头：外部拍摄人/动物/载具入水或涉水，水花全程可见。
+吉普涉水外部素材|jeep water crossing exterior raw|图库单镜头：外部拍摄人/动物/载具入水或涉水，水花全程可见。
+狗跳湖跟拍|dog jumping into lake "following shot"|图库单镜头：外部拍摄人/动物/载具入水或涉水，水花全程可见。
+跟拍皮划艇下水|"tracking shot of" kayaker launching into river|图库单镜头：外部拍摄人/动物/载具入水或涉水，水花全程可见。
+山地车过溪图库|mountain biker crossing creek stock footage|图库单镜头：外部拍摄人/动物/载具入水或涉水，水花全程可见。
+跟拍徒步过溪|"following shot of" hiker crossing stream|图库单镜头：外部拍摄人/动物/载具入水或涉水，水花全程可见。
+跳泳池一镜到底|boy jumping into pool one take|图库单镜头：外部拍摄人/动物/载具入水或涉水，水花全程可见。
 人物穿雨靴踩水坑|person splashing puddles|外部跟随人物靠近、踏水到撤离，身体与水花同框，不只拍脚。
 吉普涉水|jeep water crossing|整车、入水和水花连续，非轮胎特写。
 骑马过溪|horse crossing stream|马和骑手持续可见，踏水反馈明确。
@@ -361,6 +461,14 @@
 伦敦地标清晨跟拍|London landmark tracking shot|电影级平滑移动，备注具体地标与时段。
 悉尼海港人物轨道拍摄|Sydney Opera House tracking shot|人物、地标与活跃环境构成连续画面。
 @T8.3|补充|找专业纪录片实际追踪镜头；频道或标题写BBC不保证分辨率。镜头跟主体，排除笼舍、采访和静止对谈。
+动物移动镜头|"traveling shot of" animal|图库单镜头：外部跟拍动物或人物连续运动，主体不离画。
+猎豹行走片段|cheetah walking 4k clip|图库单镜头：外部跟拍动物或人物连续运动，主体不离画。
+野生动物跟拍素材|wildlife "tracking shot" raw|图库单镜头：外部跟拍动物或人物连续运动，主体不离画。
+跟拍企鹅行走|"tracking shot of" penguin walking|图库单镜头：外部跟拍动物或人物连续运动，主体不离画。
+跟拍雪地狐狸捕猎|"following shot of" fox hunting in snow|图库单镜头：外部跟拍动物或人物连续运动，主体不离画。
+草原大象图库|elephant walking savanna stock footage|图库单镜头：外部跟拍动物或人物连续运动，主体不离画。
+跟拍奔马|"tracking shot of" horse galloping|图库单镜头：外部跟拍动物或人物连续运动，主体不离画。
+林中鹿奔跑素材|deer running forest raw footage|图库单镜头：外部跟拍动物或人物连续运动，主体不离画。
 企鹅行走追踪|penguin walking BBC Earth|挑跟随同一企鹅的连续段，核对台标及高清源。
 狐狸狩猎追踪|fox hunting documentary|主体持续可见，避开慢动作和频繁切镜。
 猎豹奔跑追踪|cheetah running documentary|高速运动清楚且原速，主体不丢失。
@@ -368,6 +476,13 @@
 手艺人工作跟拍|craftsman documentary tracking shot|电影级相机追踪人物，非采访或纯手部特写。
 牧民行走纪录片|herder documentary tracking shot|人物持续移动与环境关系清楚，原声可闻。
 @T8.4|补充|唯一允许刻意慢速摄影的单元；仍需主体、平滑运镜与高级摄影技法。逆光可轮廓清楚，但背景虚化并未豁免。
+逆光舞者跟拍|"tracking shot of" dancer backlit|图库单镜头：氛围光线下外部跟拍人物，允许慢动作，不要剪辑混剪。
+雾中跑者跟拍|runner in fog "tracking shot"|图库单镜头：氛围光线下外部跟拍人物，允许慢动作，不要剪辑混剪。
+日落骑马跟拍|horse rider sunset "following shot"|图库单镜头：氛围光线下外部跟拍人物，允许慢动作，不要剪辑混剪。
+雨中行走慢动作|woman walking in rain slow motion|图库单镜头：氛围光线下外部跟拍人物，允许慢动作，不要剪辑混剪。
+稳定器田野舞者|"steadicam shot of" dancer in field|图库单镜头：氛围光线下外部跟拍人物，允许慢动作，不要剪辑混剪。
+黄金时刻滑板跟拍|skateboarder golden hour "tracking shot"|图库单镜头：氛围光线下外部跟拍人物，允许慢动作，不要剪辑混剪。
+推轨海边日落行走|"dolly shot of" woman walking beach sunset|图库单镜头：氛围光线下外部跟拍人物，允许慢动作，不要剪辑混剪。
 逆光舞者跟拍|backlit dancer tracking shot|舞者轮廓动作可辨，背景仍清楚，原声不被覆盖。
 晨雾跑者跟拍|runner mist cinematic tracking shot|平滑跟拍与光影层次突出，非随手记录慢放。
 夕阳骑手跟拍|horse rider sunset tracking shot|骑手轮廓、环境与光影清晰，不选航拍俯视。

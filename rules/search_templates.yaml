@@ -135,6 +135,13 @@
     },
     "T3.1": {
       "positive": [
+        "\"tracking shot of\" groomer brushing horse",
+        "dog groomer bathing dog natural sound",
+        "farmer feeding goats \"following shot\"",
+        "\"dolly shot of\" woman petting horse",
+        "owner playing with dog no talking",
+        "keeper feeding elephant real sound",
+        "couple hugging reunion one take",
         "dog groomer brushing dog",
         "groom brushing horse",
         "owner petting cat",
@@ -161,6 +168,13 @@
     },
     "T3.3": {
       "positive": [
+        "\"back view of\" couple walking dog",
+        "\"tracking shot of\" two friends walking talking",
+        "\"following shot of\" couple walking in park",
+        "\"traveling shot of\" mother and daughter walking",
+        "\"steadicam shot of\" two hikers on trail",
+        "elderly couple walking together one take",
+        "two friends walking street natural sound",
         "two friends hiking together",
         "walking and talking one take",
         "hiking guide with visitors",
@@ -173,6 +187,13 @@
     },
     "T3.4": {
       "positive": [
+        "\"tracking shot of\" two people carrying table",
+        "two men carrying kayak \"following shot\"",
+        "\"dolly shot of\" couple pitching tent",
+        "two workers carrying ladder no talking",
+        "father and son playing catch one take",
+        "\"steadicam shot of\" two people moving furniture",
+        "friends helping climb rock natural sound",
         "two people playing catch",
         "helping friend climb",
         "two people moving table",
@@ -207,6 +228,14 @@
     },
     "T4.2": {
       "positive": [
+        "\"dolly shot of\" chef chopping vegetables",
+        "baker kneading dough natural sound",
+        "noodle master hand pulled noodles real sound",
+        "tailor hand sewing no talking",
+        "\"tracking shot of\" carpenter planing wood",
+        "calligrapher brush writing single take",
+        "window cleaner squeegee raw footage",
+        "\"dolly shot of\" street food vendor cooking",
         "chef chopping vegetables",
         "baker kneading dough",
         "chef whisking eggs",
@@ -225,6 +254,13 @@
     },
     "T4.3": {
       "positive": [
+        "\"dolly shot of\" waiter setting table",
+        "\"tracking shot of\" librarian shelving books",
+        "waiter serving plates restaurant natural sound",
+        "florist arranging flowers no talking",
+        "shopkeeper stocking shelves raw footage",
+        "\"following shot of\" waiter carrying tray",
+        "tea master pouring tea one take",
         "waiter setting table",
         "mechanic organizing toolbox",
         "librarian shelving books",
@@ -239,6 +275,13 @@
     },
     "T4.4": {
       "positive": [
+        "\"following shot of\" man opening door",
+        "\"back view of\" woman opening door entering room",
+        "\"dolly shot of\" chef opening refrigerator",
+        "driver opening car door raw footage",
+        "worker opening roller shutter real sound",
+        "woman opening window single take",
+        "\"tracking shot of\" person opening cabinet",
         "chef opening refrigerator",
         "cabinetmaker drawer demonstration",
         "person opening casement window",
@@ -261,6 +304,13 @@
     },
     "T5.2": {
       "positive": [
+        "\"tracking shot of\" waves crashing on rocks",
+        "storm waves hitting breakwater raw footage",
+        "waterfall close up natural sound",
+        "tidal bore wave \"traveling shot\"",
+        "trees swaying strong wind real sound",
+        "volcano lava eruption raw footage",
+        "avalanche falling mountain stock footage",
         "wave hitting breakwater",
         "tidal bore approaching",
         "waterfall surge",
@@ -281,6 +331,13 @@
     },
     "T5.4": {
       "positive": [
+        "\"tracking shot of\" tram passing street",
+        "train passing level crossing real sound",
+        "\"traveling shot of\" ferry arriving port",
+        "car driving mountain road tracking shot",
+        "aircraft taxiing runway raw footage",
+        "tugboat pushing ship harbor stock footage",
+        "bus arriving bus stop one take",
         "tram passing intersection",
         "train passing level crossing",
         "ferry arriving harbor",
@@ -371,6 +428,13 @@
     },
     "T6.6": {
       "positive": [
+        "\"following shot of\" tourists walking with guide",
+        "\"back view of\" guide leading group",
+        "\"tracking shot of\" people walking through park",
+        "\"steadicam shot of\" family walking in garden",
+        "\"traveling shot of\" hikers walking village path",
+        "tour guide walking group old town one take",
+        "\"following shot of\" couple exploring market",
         "campus tour student guide",
         "park guided walk",
         "neighborhood guided walk",
@@ -381,6 +445,13 @@
     },
     "T6.7": {
       "positive": [
+        "\"steadicam shot of\" woman walking through office",
+        "\"following shot of\" man walking through house",
+        "\"tracking shot of\" chef walking through kitchen",
+        "\"back view of\" visitor walking through museum",
+        "\"steadicam shot of\" hotel corridor walking",
+        "artist walking through studio one take",
+        "worker walking through factory floor raw footage",
         "office tour one take",
         "workshop tour one take",
         "artist studio walkthrough",
@@ -391,6 +462,13 @@
     },
     "T6.8": {
       "positive": [
+        "\"following shot of\" man walking up stairs",
+        "escalator following shot stock",
+        "\"back view of\" woman walking downstairs",
+        "\"tracking shot of\" person climbing stairs",
+        "\"following shot of\" woman entering elevator",
+        "\"steadicam shot of\" person walking up spiral staircase",
+        "businessman riding escalator stock footage",
         "walking upstairs follow cam",
         "walking downstairs tracking shot",
         "following person escalator",
@@ -431,6 +509,13 @@
     },
     "T7.3": {
       "positive": [
+        "\"dolly shot of\" blacksmith forging",
+        "lumberjack splitting firewood natural sound",
+        "potter throwing clay pottery wheel raw footage",
+        "worker bending metal pipe real sound",
+        "\"tracking shot of\" excavator demolishing wall",
+        "man chopping wood with axe single take",
+        "\"dolly shot of\" glassblower shaping glass",
         "blacksmith hand forging",
         "splitting firewood",
         "pottery wheel throwing real time",
@@ -443,6 +528,13 @@
     },
     "T7.4": {
       "positive": [
+        "waves washing away sandcastle stock footage",
+        "lava flow close up raw footage",
+        "stream flowing over rocks natural sound",
+        "fire spreading grass real sound",
+        "\"tracking shot of\" river flowing",
+        "rain on sand close up stock footage",
+        "melting ice dripping raw footage",
         "rain washing away sand",
         "wave washing sandcastle",
         "stream flowing around rock",
@@ -463,6 +555,14 @@
     },
     "T7.6": {
       "positive": [
+        "kids splashing puddles stock footage",
+        "horse crossing river \"tracking shot\"",
+        "jeep water crossing exterior raw",
+        "dog jumping into lake \"following shot\"",
+        "\"tracking shot of\" kayaker launching into river",
+        "mountain biker crossing creek stock footage",
+        "\"following shot of\" hiker crossing stream",
+        "boy jumping into pool one take",
         "person splashing puddles",
         "jeep water crossing",
         "horse crossing stream",
@@ -517,6 +617,14 @@
     },
     "T8.3": {
       "positive": [
+        "\"traveling shot of\" animal",
+        "cheetah walking 4k clip",
+        "wildlife \"tracking shot\" raw",
+        "\"tracking shot of\" penguin walking",
+        "\"following shot of\" fox hunting in snow",
+        "elephant walking savanna stock footage",
+        "\"tracking shot of\" horse galloping",
+        "deer running forest raw footage",
         "penguin walking BBC Earth",
         "fox hunting documentary",
         "cheetah running documentary",
@@ -527,6 +635,13 @@
     },
     "T8.4": {
       "positive": [
+        "\"tracking shot of\" dancer backlit",
+        "runner in fog \"tracking shot\"",
+        "horse rider sunset \"following shot\"",
+        "woman walking in rain slow motion",
+        "\"steadicam shot of\" dancer in field",
+        "skateboarder golden hour \"tracking shot\"",
+        "\"dolly shot of\" woman walking beach sunset",
         "backlit dancer tracking shot",
         "runner mist cinematic tracking shot",
         "horse rider sunset tracking shot",

@@ -1,7 +1,7 @@
 const $ = selector => document.querySelector(selector);
 const REVIEW_PAGE_SIZE = 20;
 let queue = [], index = 0, current = null, ruleBook = null;
-let reviewPage = 1, reviewTotal = 0, reviewBucket = '';
+let reviewPage = 1, reviewTotal = 0, reviewBucket = '', reviewUnit = '';
 let reviewCamera = '', cameraBusy = false;
 let operatorBusy = false;
 const operatorLabels = {SMALL:'操作者疑似过小', HANDS_ONLY:'疑似仅见手部', PARTIAL:'人物可见不完整', VISIBLE:'检测到人物头肩及部分身体', MIXED:'部分时段有构图风险', UNKNOWN:'无法可靠判断', NOT_APPLICABLE:'当前单元未启用', UNTESTED:'尚未检测'};
@@ -41,6 +41,13 @@ async function init() {
     .map(([id, bucket]) => `<option value="${id}">${id} ${bucket.name}</option>`).join('') + '<option value="unassigned">未分类</option>';
   $('#review-bucket-filter').onchange = async event => {
     reviewBucket = event.target.value;
+    reviewUnit = '';
+    fillReviewUnits();
+    await loadQueue(1, 0);
+  };
+  fillReviewUnits();
+  $('#review-unit-filter').onchange = async event => {
+    reviewUnit = event.target.value;
     await loadQueue(1, 0);
   };
   $('#camera-filter').onchange = async event => {
@@ -52,6 +59,13 @@ async function init() {
   await loadQueue(1, 0);
 }
 
+function fillReviewUnits() {
+  $('#review-unit-filter').innerHTML = '<option value="">全部单元</option>' + Object.entries(ruleBook.units)
+    .filter(([id]) => !reviewBucket || id.startsWith(reviewBucket + '.'))
+    .map(([id, unit]) => `<option value="${esc(id)}">${esc(id)} ${esc(unit.name)}</option>`).join('');
+  $('#review-unit-filter').value = reviewUnit;
+}
+
 function fillUnits(selected = '') {
   const bucket = $('#bucket').value;
   $('#unit').innerHTML = '<option value="">待人工判断</option>' + Object.entries(ruleBook.units)
@@ -61,8 +75,8 @@ function fillUnits(selected = '') {
 }
 
 async function loadQueue(page = reviewPage, desiredIndex = 0) {
-  const bucket = encodeURIComponent(reviewBucket);
-  const data = await api(`/api/candidates?status=WAITING_REVIEW&bucket=${bucket}&camera=${encodeURIComponent(reviewCamera)}&page=${page}&page_size=${REVIEW_PAGE_SIZE}`);
+  const bucket = encodeURIComponent(reviewBucket), unit = encodeURIComponent(reviewUnit);
+  const data = await api(`/api/candidates?status=WAITING_REVIEW&bucket=${bucket}&camera=${encodeURIComponent(reviewCamera)}&unit=${unit}&page=${page}&page_size=${REVIEW_PAGE_SIZE}`);
   queue = data.items;
   reviewPage = Number(data.page || 1);
   reviewTotal = Number(data.total || 0);
@@ -82,9 +96,10 @@ async function show() {
     $('#video').hidden = true;
     $('#video-empty').hidden = false;
     $('#candidate-title').textContent = '候选判断';
-    $('#queue-meta').textContent = reviewTotal ? '当前页没有待审核候选' : '该分类没有待审核候选';
+    $('#queue-meta').textContent = reviewTotal ? '当前页没有待审核候选' : '当前筛选条件下没有待审核候选';
     $('#rules').innerHTML = '<div class="empty">已处理完毕</div>';
     $('#rules-summary').textContent = '暂无候选';
+    $('#source-reject-meta').textContent = '';
     renderCamera();
     return;
   }
@@ -112,12 +127,13 @@ async function show() {
   $('#source-meta').innerHTML = `<a href="${esc(current.source_url)}" target="_blank" rel="noreferrer">${esc(current.source_title || current.source_url)}</a>`;
   $('#clip-time').textContent = `${current.start_time.toFixed(2)}s → ${current.end_time.toFixed(2)}s · ${current.duration.toFixed(2)}s`;
   $('#candidate-title').textContent = `候选判断 · #${current.id}`;
+  $('#source-reject-meta').textContent = `来源 #${current.source_id}`;
   const globalPosition = (reviewPage - 1) * REVIEW_PAGE_SIZE + index + 1;
   $('#queue-meta').textContent = `#${current.id} · ${globalPosition} / ${reviewTotal} · 本页 ${index + 1} / ${queue.length} · 分数 ${Number(current.score).toFixed(0)}`;
   $('#bucket').value = current.candidate_bucket || '';
   fillUnits(current.candidate_unit || '');
-  $('#viewpoint').value = current.candidate_viewpoint || '';
   $('#notes').value = '';
+  $('#description').value = current.delivery_description || '';
   renderTrim();
   renderCamera();
   renderRules(current.rules);
@@ -273,13 +289,9 @@ $('#close-drawer').onclick = () => $('#drawer').classList.remove('open');
 
 async function decide(decision, confirmHard = false) {
   if (!current) return;
-  if (decision === 'ACCEPT' && !['first_person', 'third_person'].includes($('#viewpoint').value)) {
-    notice('请先选择第一人称或第三人称，再提交接受。', true);
-    $('#viewpoint').focus();
-    return;
-  }
   const payload = {decision, final_bucket: $('#bucket').value || null, final_unit: $('#unit').value || null,
-    final_viewpoint: $('#viewpoint').value || null, notes: $('#notes').value,
+    delivery_description: $('#description').value || null,
+    notes: $('#notes').value,
     manual_rule_overrides: {}, confirm_hard_fail: confirmHard};
   try {
     await api(`/api/candidates/${current.id}/review`, {method: 'POST', body: JSON.stringify(payload)});
@@ -289,9 +301,10 @@ async function decide(decision, confirmHard = false) {
     } else {
       current.candidate_bucket = payload.final_bucket;
       current.candidate_unit = payload.final_unit;
-      current.candidate_viewpoint = payload.final_viewpoint;
       notice('标签已保存，候选仍在审核队列。');
-      if (reviewBucket && reviewBucket !== payload.final_bucket) await loadQueue(reviewPage, index);
+      if ((reviewBucket && reviewBucket !== payload.final_bucket) || (reviewUnit && reviewUnit !== payload.final_unit)) {
+        await loadQueue(reviewPage, index);
+      }
     }
   } catch (error) {
     if (error.status === 409 && error.data.requires_confirmation) {
@@ -307,8 +320,21 @@ async function saveLabels() {
   await decide('RESTORE');
 }
 
+async function rejectSource() {
+  if (!current) return;
+  const sourceId = current.source_id, notes = $('#notes').value.trim();
+  const title = current.source_title || current.source_url || '该来源';
+  if (!confirm(`将打回来源 #${sourceId}「${title}」下全部待审候选（已接受、已交付的不受影响）。\n备注：${notes || '（无）'}\n\n确定打回？`)) return;
+  try {
+    const data = await api(`/api/sources/${sourceId}/reject-waiting`, {method: 'POST', body: JSON.stringify({notes})});
+    notice(`来源 #${sourceId}：已打回 ${data.count} 条待审候选。`);
+    await loadQueue(reviewPage, index);
+  } catch (error) { notice(error.message, true); }
+}
+
 $('#accept').onclick = () => decide('ACCEPT');
 $('#reject').onclick = () => decide('REJECT');
+$('#reject-source').onclick = rejectSource;
 $('#edit').onclick = saveLabels;
 $('#prev').onclick = () => moveCandidate(-1);
 $('#next').onclick = () => moveCandidate(1);

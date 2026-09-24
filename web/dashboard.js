@@ -126,9 +126,9 @@ async function loadDashboard() {
   $('#tools').innerHTML = Object.entries(tools).map(([name, ok]) => `<span class="tool ${ok ? 'ok' : 'bad'}">${ok ? '●' : '○'} ${name}</span>`).join('');
   if (data.traffic.today > warningBytes) notice(`今日下载已超过软上限：${fmtBytes(data.traffic.today)}。系统仅警告，不会强制停止。`, true);
   $('#quota').innerHTML = quota.map(item => {
-    const first = Math.min(100, item.first_person.actual / Math.max(1, item.first_person.target) * 100);
-    const third = Math.min(100, item.third_person.actual / Math.max(1, item.third_person.target) * 100);
-    return `<div class="quota-row"><strong>${item.bucket} ${item.name}</strong><div class="quota-item"><span>第一人称 ${item.first_person.actual}/${item.first_person.target}</span><div class="progress"><i style="width:${first}%"></i></div></div><div class="quota-item"><span>第三人称 ${item.third_person.actual}/${item.third_person.target}</span><div class="progress"><i style="width:${third}%"></i></div></div><span class="badge warn">最缺：${item.largest_gap}</span></div>`;
+    const total = Math.min(100, item.total.actual / Math.max(1, item.total.target) * 100);
+    const tiers = ['short', 'medium', 'long'].map(d => `${{short: '短', medium: '中', long: '长'}[d]} ${item.duration[d].actual}/${item.duration[d].recommended}`).join(' · ');
+    return `<div class="quota-row"><strong>${item.bucket} ${item.name}</strong><div class="quota-item"><span>已接受 ${item.total.actual}/${item.total.target}</span><div class="progress"><i style="width:${total}%"></i></div></div><div class="quota-item"><span>时长档（实际/建议）</span>${tiers}</div><span class="badge warn">最缺：${item.largest_gap}</span></div>`;
   }).join('');
 }
 
@@ -248,9 +248,9 @@ async function loadQueues() {
     const details = failures.map(rule => `<small class="fail">${escapeHtml(rule.rule_id + '：' + rule.reason)}</small>`).join('');
     const resolution = candidate.width && candidate.height ? `${candidate.width}×${candidate.height}` : '原片分辨率待检测';
     const qa = candidate.qa_status === 'TRIM_REQUIRED' ? '<small><span class="badge warn">需按主体重新切分</span></small>' : candidate.qa_status && candidate.qa_status !== 'PASS' ? `<small><span class="badge fail">QA ${candidate.qa_status}</span></small>` : finalized ? '<small><span class="badge warn">已处理，等待导出</span></small>' : '';
-    return `<tr><td>#${candidate.id}<small>${escapeHtml(candidate.source_title)}</small>${details}</td><td>${candidate.candidate_unit || '—'} · ${candidate.candidate_viewpoint === 'first_person' ? '第一人称' : candidate.candidate_viewpoint === 'third_person' ? '第三人称' : '待定'}</td><td>${Number(candidate.duration).toFixed(1)}s<small>${resolution}</small>${qa}</td><td><button onclick="finalize(${candidate.id},this)">${finalized ? '重新处理' : '最终处理'}</button></td></tr>`;
+    return `<tr><td>#${candidate.id}<small>${escapeHtml(candidate.source_title)}</small>${details}</td><td>${candidate.candidate_unit || '—'}</td><td>${Number(candidate.duration).toFixed(1)}s<small>${resolution}</small>${qa}</td><td><button onclick="finalize(${candidate.id},this)">${finalized ? '重新处理' : '最终处理'}</button></td></tr>`;
   }).join('') : '<tr><td colspan="4" class="empty">暂无待最终处理候选</td></tr>';
-  $('#processed').innerHTML = processed.items.length ? processed.items.map(candidate => `<tr><td>#${candidate.id}<small>${escapeHtml(candidate.source_title)}</small></td><td>${candidate.candidate_unit || '—'} · ${candidate.candidate_viewpoint === 'first_person' ? '第一人称' : '第三人称'}</td><td>${new Date(candidate.exported_at).toLocaleString('zh-CN')}</td><td><button class="secondary" onclick="restoreProcessed(${candidate.id},this)">移回最终处理</button></td></tr>`).join('') : '<tr><td colspan="4" class="empty">暂无已处理候选。</td></tr>';
+  $('#processed').innerHTML = processed.items.length ? processed.items.map(candidate => `<tr><td>#${candidate.id}<small>${escapeHtml(candidate.source_title)}</small></td><td>${candidate.candidate_unit || '—'}</td><td>${new Date(candidate.exported_at).toLocaleString('zh-CN')}</td><td><button class="secondary" onclick="restoreProcessed(${candidate.id},this)">移回最终处理</button></td></tr>`).join('') : '<tr><td colspan="4" class="empty">暂无已处理候选。</td></tr>';
   $('#rejected').innerHTML = rejected.items.length ? rejected.items.map(candidate => `<tr><td>#${candidate.id}<small>${escapeHtml(candidate.source_title)}</small><small>${escapeHtml(candidate.rejection_reason || '')}</small></td><td>${candidate.candidate_unit || '—'}</td><td><button class="secondary" onclick="restore(${candidate.id},this)">恢复</button></td></tr>`).join('') : '<tr><td colspan="3" class="empty">暂无拒绝记录</td></tr>';
   renderPagination('#accepted-pagination', 'accepted', accepted);
   renderPagination('#processed-pagination', 'processed', processed);

@@ -6,10 +6,35 @@ from pathlib import Path
 from typing import Any
 
 
-# The first production use-case is a clearly visible human athlete. Applying a
-# person detector to animals, vehicles, hands, or first-person footage would
-# create unsafe cuts, so expansion to other units must use a matching detector.
-SUPPORTED_PERSON_UNITS = frozenset({"T1.1"})
+# Enabled for every unit whose rulebook subject is a clearly visible human.
+# Applying a person detector to animals, vehicles, hands, or first-person
+# footage would create unsafe cuts, so units whose subject may be a pet, a
+# vehicle, a crowd or a natural event stay out: T1.3/T1.6-T1.9 (vehicles),
+# T3.1 (mostly POV hands and pets, and its pass criterion is one unbroken
+# contact arc), T5.1/T5.2/T5.4-T5.6 (vehicles, weather, traffic, scenery),
+# T5.7 (the subject is the crowd or an animal flock, not one person),
+# T6.1-T6.5 (the place is the subject), T8.1-T8.3 (framing or animals).
+# Footage that opens without a prominent person still degrades safely: the
+# analyzer reports LOW_CONFIDENCE and never splits.
+SUPPORTED_PERSON_UNITS = frozenset({
+    "T1.1", "T1.2", "T1.4",
+    "T3.2", "T3.3", "T3.4", "T3.5",
+    "T5.3",
+    "T6.6", "T6.7", "T6.8", "T6.9",
+    "T8.4",
+})
+
+# Calibrated against 161 labelled clips. A 0.25s grid keeps a fast subject on
+# the timeline between samples, and 3.5s is the shortest sustained absence that
+# never cut a clip a reviewer had accepted; a 1.5s threshold chopped 6 of the 27
+# accepted clips into unusable pieces. Both values are constructor arguments so
+# a future re-calibration does not have to touch the analysis code.
+SAMPLE_INTERVAL_SECONDS = 0.25
+SUSTAINED_LOSS_SECONDS = 3.5
+
+# Reported when the subject leaves for good but nothing that remains reaches the
+# 5s delivery minimum. The whole range is kept for a human instead of dropped.
+NO_SEGMENT_NOTE = "主体离场但无 ≥5s 子段，保留整段待人工"
 
 
 @dataclass(frozen=True)
@@ -27,7 +52,8 @@ class SubjectContinuity:
         key = f"{segment[0]:.3f}:{segment[1]:.3f}"
         advice = dict((self.boundary_advice or {}).get(key, {}))
         return {
-            "subject_check": "PASS" if self.reliable else "UNKNOWN",
+            "subject_check": ("NO_SEGMENT" if self.status == "NO_SEGMENT" else "PASS") if self.reliable else "UNKNOWN",
+            "subject_note": NO_SEGMENT_NOTE if self.status == "NO_SEGMENT" else "",
             "subject_detector": evidence.get("method"),
             "subject_split_applied": self.status == "SPLIT",
             "subject_segment_start": round(segment[0], 3),
@@ -45,8 +71,8 @@ def split_presence_samples(
     end: float,
     present_times: list[float],
     *,
-    sample_interval: float = 0.5,
-    minimum_loss: float = 4.0,
+    sample_interval: float = SAMPLE_INTERVAL_SECONDS,
+    minimum_loss: float = SUSTAINED_LOSS_SECONDS,
     minimum_segment: float = 5.0,
 ) -> tuple[tuple[tuple[float, float], ...], tuple[dict[str, float], ...]]:
     """Split only on sustained absence, retaining every independently useful side.
@@ -116,12 +142,15 @@ def select_motion_valley(samples: list[tuple[float, float]]) -> tuple[float, flo
 
 
 class SubjectContinuityAnalyzer:
-    """Conservative prominent-person continuity analysis for T1.1 footage."""
+    """Conservative prominent-person continuity analysis for person-subject units."""
 
     VOC_PERSON_CLASS = 15
 
-    def __init__(self, model_dir: Path):
+    def __init__(self, model_dir: Path, sample_interval: float = SAMPLE_INTERVAL_SECONDS,
+                 minimum_loss: float = SUSTAINED_LOSS_SECONDS):
         self.model_dir = Path(model_dir)
+        self.sample_interval = float(sample_interval)
+        self.minimum_loss = float(minimum_loss)
         self.prototxt = self.model_dir / "mobilenet_ssd_deploy.prototxt"
         self.weights = self.model_dir / "mobilenet_ssd.caffemodel"
         self._cv2 = None
@@ -148,7 +177,12 @@ class SubjectContinuityAnalyzer:
         if self._net is None:
             if not self.available:
                 raise RuntimeError("主体检测组件未安装")
-            self._net = self._cv2.dnn.readNetFromCaffe(str(self.prototxt), str(self.weights))
+            # The Caffe importer opens the files through the C++ locale, which
+            # fails on Windows whenever the install path contains non-ASCII
+            # characters. Reading the bytes in Python and handing them over
+            # keeps the model loadable from any path.
+            self._net = self._cv2.dnn.readNetFromCaffe(bufferProto=self.prototxt.read_bytes(),
+                                                       bufferModel=self.weights.read_bytes())
         return self._net
 
     def _person_area_ratios(self, frame) -> list[float]:
@@ -259,17 +293,34 @@ class SubjectContinuityAnalyzer:
             return SubjectContinuity(True, False, "UNREADABLE", original,
                                      evidence={"method": "mobilenet_ssd_prominent_person"})
 
-        sample_interval = 0.5
+        sample_interval = self.sample_interval
         samples: list[tuple[float, float]] = []
-        at = float(start)
         try:
-            while at < end + 0.001:
-                cap.set(cv2.CAP_PROP_POS_MSEC, at * 1000.0)
-                ok, frame = cap.read()
-                if ok:
+            # Decode the range once and skip between samples with grab(), which
+            # stays inside the codec's frame order. Seeking to every sample
+            # instead re-decodes from the preceding keyframe each time and costs
+            # an order of magnitude more on 4K sources. The sampling grid is
+            # snapped to whole frames so the reported times stay exact.
+            fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+            if fps <= 0:
+                return SubjectContinuity(True, False, "UNREADABLE", original,
+                                         evidence={"method": "mobilenet_ssd_prominent_person"})
+            step = max(1, int(round(fps * sample_interval)))
+            sample_interval = step / fps
+            first, last = int(round(start * fps)), int(round(end * fps))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, first)
+            index = first
+            while index < last:
+                if (index - first) % step:
+                    if not cap.grab():
+                        break
+                else:
+                    ok, frame = cap.read()
+                    if not ok or frame is None:
+                        break
                     areas = self._person_area_ratios(frame)
-                    samples.append((round(at, 3), max(areas, default=0.0)))
-                at += sample_interval
+                    samples.append((round(index / fps, 3), max(areas, default=0.0)))
+                index += 1
         finally:
             cap.release()
 
@@ -281,7 +332,12 @@ class SubjectContinuityAnalyzer:
         prominence_floor = max(0.014, baseline * 0.30)
         present = [at for at, area in samples if area >= prominence_floor]
         seed_present = [at for at in present if at <= seed_end]
-        reliable = len(seed_present) >= 4 and len(present) >= 6 and (not present or present[0] <= start + 1.0)
+        # The confidence floor is expressed in seconds of confirmed presence, so
+        # a denser sampling grid does not silently weaken it.
+        need_seed = max(4, int(round(2.0 / sample_interval)))
+        need_total = max(6, int(round(3.0 / sample_interval)))
+        reliable = (len(seed_present) >= need_seed and len(present) >= need_total
+                    and (not present or present[0] <= start + 1.0))
         evidence = {
             "method": "mobilenet_ssd_prominent_person",
             "sample_interval": sample_interval,
@@ -293,7 +349,14 @@ class SubjectContinuityAnalyzer:
         if not reliable:
             return SubjectContinuity(True, False, "LOW_CONFIDENCE", original, evidence=evidence)
 
-        segments, gaps = split_presence_samples(start, end, present, sample_interval=sample_interval)
-        status = "SPLIT" if len(segments) > 1 or segments != original else "PASS"
+        segments, gaps = split_presence_samples(start, end, present, sample_interval=sample_interval,
+                                                minimum_loss=self.minimum_loss)
         boundary_advice = self._boundary_advice(path, segments, gaps)
+        if gaps and segments == original:
+            # The subject was lost for good, but every remaining visible stretch
+            # is shorter than the 5s delivery minimum, so there is nothing to cut
+            # to. Hand the whole range to a reviewer rather than reporting a
+            # clean pass and losing the finding.
+            return SubjectContinuity(True, True, "NO_SEGMENT", original, gaps, evidence, boundary_advice)
+        status = "SPLIT" if len(segments) > 1 or segments != original else "PASS"
         return SubjectContinuity(True, True, status, segments, gaps, evidence, boundary_advice)

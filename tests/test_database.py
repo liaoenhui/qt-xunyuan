@@ -27,17 +27,15 @@ class DatabaseTests(unittest.TestCase):
                 db.set_source_deleted(sid, True)
             self.assertIsNone(db.get_source(sid)['deleted_at'])
 
-    def test_accept_requires_explicit_viewpoint(self):
+    def test_accept_and_quota_state_need_only_bucket_and_duration(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / 'test.sqlite3')
             sid, _ = db.add_source({'platform': 'test', 'video_id': 'view', 'url': 'https://example.test/view'})
-            cid, _ = db.add_candidate({'source_id': sid, 'start_time': 0, 'end_time': 6, 'duration': 6})
-            for value in (None, '', 'unknown'):
-                with self.assertRaisesRegex(ValueError, '人称'):
-                    db.review(cid, {'decision': 'ACCEPT', 'final_viewpoint': value})
-            self.assertNotEqual(db.get_candidate(cid)['status'], 'ACCEPTED')
-            db.review(cid, {'decision': 'ACCEPT', 'final_viewpoint': 'third_person'})
+            cid, _ = db.add_candidate({'source_id': sid, 'start_time': 0, 'end_time': 6, 'duration': 6,
+                                      'duration_bucket': 'short'})
+            db.review(cid, {'decision': 'ACCEPT', 'final_bucket': 'T1', 'final_unit': 'T1.1'})
             self.assertEqual(db.get_candidate(cid)['status'], 'ACCEPTED')
+            self.assertEqual(db.quota_state(), [{'bucket': 'T1', 'duration_bucket': 'short', 'count': 1}])
 
     def test_waiting_candidate_can_be_trimmed_and_facts_are_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -259,6 +257,76 @@ class DatabaseTests(unittest.TestCase):
             third = add_final("T1.1", 30)
             self.assertEqual(reopened.reserve_delivery_filename(third, "T1.1", "新片段")["filename"],
                              "T1.1_003_新片段.mp4")
+
+
+class CandidateUnitFilterTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.db = Database(Path(self.tmp.name) / "test.sqlite3")
+        source_id, _ = self.db.add_source({"platform": "test", "video_id": "unit-filter",
+                                           "url": "https://example.test/unit-filter"})
+        self.ids = {}
+        candidates = [
+            ("t11", "T1", "T1.1", "WAITING_REVIEW"),
+            ("t11_inferred", None, "T1.1", "WAITING_REVIEW"),
+            ("t12", "T1", "T1.2", "WAITING_REVIEW"),
+            ("t22", "T2", "T2.2", "WAITING_REVIEW"),
+            ("t11_rejected", "T1", "T1.1", "REJECTED"),
+            ("null_labels", None, None, "WAITING_REVIEW"),
+            ("empty_labels", "", "", "WAITING_REVIEW"),
+            ("bucket_only", "T1", None, "WAITING_REVIEW"),
+            ("unit_prefix", "T1", "T1.10", "WAITING_REVIEW"),
+        ]
+        for index, (name, bucket, unit, status) in enumerate(candidates):
+            self.ids[name], _ = self.db.add_candidate({
+                "source_id": source_id, "start_time": index * 10, "end_time": index * 10 + 10,
+                "duration": 10, "candidate_bucket": bucket, "candidate_unit": unit, "status": status,
+            })
+
+    def assert_candidates(self, names, **filters):
+        expected = [self.ids[name] for name in names]
+        self.assertEqual(self.db.count_candidates(**filters), len(expected))
+        self.assertEqual([row["id"] for row in self.db.list_candidates(**filters)], expected)
+
+    def test_unit_filter_is_exact_and_works_without_bucket_or_status(self):
+        self.assert_candidates(["t11", "t11_inferred", "t11_rejected"], unit="T1.1")
+        self.assert_candidates(["t22"], unit="T2.2")
+
+    def test_unit_combines_with_status_and_bucket_including_inferred_bucket(self):
+        self.assert_candidates(["t11", "t11_inferred"],
+                               status="WAITING_REVIEW", bucket="T1", unit="T1.1")
+        self.assert_candidates(["t11_rejected"], status="REJECTED", unit="T1.1")
+        self.assert_candidates(["t22"], status="WAITING_REVIEW", bucket="T2", unit="T2.2")
+
+    def test_empty_filters_and_existing_positional_calls_remain_compatible(self):
+        self.assert_candidates(list(self.ids), status="", bucket="", unit="")
+        self.assert_candidates(list(self.ids), status=None, bucket=None, unit=None)
+        self.assertEqual(self.db.count_candidates("WAITING_REVIEW", "T1"), 5)
+        self.assertEqual([row["id"] for row in self.db.list_candidates("WAITING_REVIEW", 1, 1, "T1")],
+                         [self.ids["t11_inferred"]])
+        self.assert_candidates(["t11", "t11_inferred", "t12", "bucket_only", "unit_prefix"],
+                               status="WAITING_REVIEW", bucket="T1", unit="")
+
+    def test_unassigned_requires_both_labels_empty_and_cannot_match_a_unit(self):
+        self.assert_candidates(["null_labels", "empty_labels"], bucket="unassigned", unit="")
+        self.assert_candidates([], bucket="unassigned", unit="T1.1")
+
+    def test_no_matches_and_sql_metacharacters_are_not_interpreted(self):
+        for filters in ({"bucket": "T2", "unit": "T1.1"},
+                        {"status": "REJECTED", "unit": "T2.2"},
+                        {"unit": "T9.999"}, {"unit": "T1.%"},
+                        {"unit": "T1.1' OR 1=1 --"}):
+            with self.subTest(filters=filters):
+                self.assert_candidates([], **filters)
+
+    def test_unit_pagination_counts_all_matches_and_preserves_order(self):
+        filters = {"status": "WAITING_REVIEW", "bucket": "T1", "unit": "T1.1"}
+        self.assertEqual(self.db.count_candidates(**filters), 2)
+        for offset, names in ((0, ["t11"]), (1, ["t11_inferred"]), (2, [])):
+            with self.subTest(offset=offset):
+                rows = self.db.list_candidates(limit=1, offset=offset, **filters)
+                self.assertEqual([row["id"] for row in rows], [self.ids[name] for name in names])
 
 
 if __name__ == "__main__":

@@ -194,11 +194,13 @@ class Handler(BaseHTTPRequestHandler):
                 status = q.get("status", [None])[0]
                 bucket = q.get("bucket", [None])[0]
                 camera = q.get("camera", [None])[0]
-                total = self.app.db.count_candidates(status, bucket, camera)
+                unit = q.get("unit", [None])[0]
+                total = self.app.db.count_candidates(status, bucket, camera, unit)
                 page, page_size, offset = self._pagination(q, total, 100)
                 return self._json({"ok": True,
-                                   "items": self.app.db.list_candidates(status, page_size, offset, bucket, camera),
-                                   "total": total, "page": page, "page_size": page_size, "bucket": bucket})
+                                   "items": self.app.db.list_candidates(status, page_size, offset, bucket, camera, unit),
+                                   "total": total, "page": page, "page_size": page_size, "bucket": bucket,
+                                   "camera": camera, "unit": unit})
             if path == "/api/final-candidates":
                 q = parse_qs(parsed.query)
                 state = q.get("state", ["pending"])[0]
@@ -254,6 +256,12 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("deleted 必须是布尔值")
                 self.app.db.set_source_deleted(int(match.group(1)), data["deleted"])
                 return self._json({"ok": True})
+            if match := re.fullmatch(r"/api/sources/(\d+)/reject-waiting", path):
+                source_id = int(match.group(1))
+                if not self.app.db.get_source(source_id):
+                    raise KeyError("来源不存在")
+                ids = self.app.db.reject_waiting_by_source(source_id, str(data.get("notes") or "").strip())
+                return self._json({"ok": True, "rejected_ids": ids, "count": len(ids)})
             if match := re.fullmatch(r"/api/sources/(\d+)/analysis-state", path):
                 source_id = int(match.group(1))
                 if not self.app.db.get_source(source_id):
@@ -301,22 +309,18 @@ class Handler(BaseHTTPRequestHandler):
             self._error(exc)
 
     def _quota(self) -> list[dict[str, Any]]:
-        actual = {(r["bucket"], r["viewpoint"], r["duration_bucket"]): r["count"] for r in self.app.db.quota_state()}
+        actual = {(r["bucket"], r["duration_bucket"]): r["count"] for r in self.app.db.quota_state()}
         result = []
         for bucket, cfg in self.app.rules.buckets.items():
             total = cfg["target_total"]
             row = {"bucket": bucket, "name": cfg["name"], "target": total,
-                   "first_person": {"actual": sum(v for (b, p, _), v in actual.items() if b == bucket and p == "first_person"), "target": cfg["first_person"]},
-                   "third_person": {"actual": sum(v for (b, p, _), v in actual.items() if b == bucket and p == "third_person"), "target": cfg["third_person"]},
-                   "duration": {d: {"actual": sum(v for (b, _, db), v in actual.items() if b == bucket and db == d),
+                   "total": {"actual": sum(v for (b, _), v in actual.items() if b == bucket), "target": total},
+                   "duration": {d: {"actual": sum(v for (b, db), v in actual.items() if b == bucket and db == d),
                                      "recommended": round(total * ratio), "minimum": round(total * .2)}
                                 for d, ratio in {"short": .4, "medium": .35, "long": .25}.items()}}
-            gaps = [
-                (cfg["first_person"] - row["first_person"]["actual"], "第一人称"),
-                (cfg["third_person"] - row["third_person"]["actual"], "第三人称"),
-                *[(row["duration"][d]["recommended"] - row["duration"][d]["actual"], {"short": "短档", "medium": "中档", "long": "长档"}[d]) for d in ("short", "medium", "long")],
-            ]
-            row["largest_gap"] = max(gaps)[1]
+            gaps = [(row["duration"][d]["recommended"] - row["duration"][d]["actual"], {"short": "短档", "medium": "中档", "long": "长档"}[d])
+                    for d in ("short", "medium", "long")]
+            row["largest_gap"] = "已达标" if row["total"]["actual"] >= total else max(gaps)[1]
             result.append(row)
         return result
 

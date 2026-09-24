@@ -118,7 +118,7 @@ td small.source-error { margin-top: 5px; max-width: 520px; color: #ffb3ba; white
 .video-wrap { background: #05070a; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; display: grid; place-items: center; }
 video { width: 100%; height: 100%; object-fit: contain; }
 .clip-meta { display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; color: var(--muted); }
-.recommend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.recommend { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
 .recommend label { color: var(--muted); font-size: 11px; }
 .recommend select { width: 100%; margin-top: 4px; }
 .trim-panel { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #101722; }
@@ -153,3 +153,6 @@ video { width: 100%; height: 100%; object-fit: contain; }
 .empty { padding: 40px; text-align: center; color: var(--muted); }
 @media (max-width: 1050px) { .metrics { grid-template-columns: repeat(3, 1fr); } .two-col, .review-layout { grid-template-columns: 1fr; } }
 @media (max-width: 680px) { .page { padding: 12px; } .metrics { grid-template-columns: repeat(2, 1fr); } .form-row { grid-template-columns: 1fr; } .quota-row { grid-template-columns: 1fr 1fr; } .drawer { width: 92vw; right: -100vw; } .drawer.open { right: 0; } }
+.source-reject { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.source-reject button { padding: 7px 10px; font-size: 12px; }
+.source-reject span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }

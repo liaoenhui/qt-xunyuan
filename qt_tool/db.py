@@ -69,9 +69,10 @@ CREATE TABLE IF NOT EXISTS candidate_shots (
   proxy_path TEXT,
   candidate_bucket TEXT,
   candidate_unit TEXT,
-  candidate_viewpoint TEXT,
+  candidate_viewpoint TEXT, -- kept for existing databases, no longer used
   material_type TEXT,
   duration_bucket TEXT,
+  delivery_description TEXT,
   score REAL NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'WAITING_REVIEW',
   representative_hash TEXT,
@@ -107,7 +108,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   decision TEXT NOT NULL,
   final_bucket TEXT,
   final_unit TEXT,
-  final_viewpoint TEXT,
+  final_viewpoint TEXT, -- kept for existing databases, no longer used
   notes TEXT,
   manual_rule_overrides TEXT NOT NULL DEFAULT '{}',
   reviewed_at TEXT NOT NULL
@@ -164,6 +165,7 @@ CREATE INDEX IF NOT EXISTS idx_sources_status ON sources(status);
 CREATE INDEX IF NOT EXISTS idx_candidates_status ON candidate_shots(status);
 CREATE INDEX IF NOT EXISTS idx_rules_candidate ON rule_results(candidate_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_reviews_candidate ON reviews(candidate_id);
 """
 
 
@@ -187,6 +189,9 @@ class Database:
                 con.execute("ALTER TABLE sources ADD COLUMN analysis_completed INTEGER NOT NULL DEFAULT 0")
                 con.execute("""UPDATE sources SET analysis_completed=1
                                WHERE EXISTS (SELECT 1 FROM candidate_shots c WHERE c.source_id=sources.id)""")
+            candidate_columns = {row[1] for row in con.execute("PRAGMA table_info(candidate_shots)")}
+            if "delivery_description" not in candidate_columns:
+                con.execute("ALTER TABLE candidate_shots ADD COLUMN delivery_description TEXT")
             final_columns = {row[1] for row in con.execute("PRAGMA table_info(final_clips)")}
             if "exported_at" not in final_columns:
                 con.execute("ALTER TABLE final_clips ADD COLUMN exported_at TEXT")
@@ -461,11 +466,11 @@ class Database:
                 return int(row["id"]), False
             cur = con.execute(
                 """INSERT INTO candidate_shots
-                (source_id,start_time,end_time,duration,proxy_path,candidate_bucket,candidate_unit,candidate_viewpoint,
+                (source_id,start_time,end_time,duration,proxy_path,candidate_bucket,candidate_unit,
                  material_type,duration_bucket,score,status,representative_hash,facts_json,created_at)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (data["source_id"], data["start_time"], data["end_time"], data["duration"], data.get("proxy_path"),
-                 data.get("candidate_bucket"), data.get("candidate_unit"), data.get("candidate_viewpoint"),
+                 data.get("candidate_bucket"), data.get("candidate_unit"),
                  data.get("material_type"), data.get("duration_bucket"), data.get("score", 0),
                  data.get("status", "WAITING_REVIEW"), data.get("representative_hash"),
                  json.dumps(data.get("facts", {}), ensure_ascii=False), now()))
@@ -558,9 +563,11 @@ class Database:
             raise ValueError("未知运镜筛选分类")
         return field + "=?", [camera]
 
-    def count_candidates(self, status: str | None = None, bucket: str | None = None, camera: str | None = None) -> int:
+    @classmethod
+    def _candidate_filters(cls, status: str | None = None, bucket: str | None = None,
+                           camera: str | None = None, unit: str | None = None) -> tuple[str, list[Any]]:
         conditions, args = (["c.status=?"], [status]) if status else ([], [])
-        bucket_condition, bucket_args = self._bucket_condition("c.candidate_unit", bucket)
+        bucket_condition, bucket_args = cls._bucket_condition("c.candidate_unit", bucket)
         if bucket_condition:
             if bucket == "unassigned":
                 bucket_condition = "((c.candidate_bucket IS NULL OR c.candidate_bucket='') AND " + bucket_condition + ")"
@@ -569,31 +576,25 @@ class Database:
                 bucket_args = [bucket] + bucket_args
             conditions.append(bucket_condition)
             args.extend(bucket_args)
-        camera_condition, camera_args = self._camera_condition(camera)
+        camera_condition, camera_args = cls._camera_condition(camera)
         if camera_condition:
             conditions.append(camera_condition)
             args.extend(camera_args)
-        where = "WHERE " + " AND ".join(conditions) if conditions else ""
+        if unit:
+            conditions.append("c.candidate_unit=?")
+            args.append(unit)
+        return ("WHERE " + " AND ".join(conditions) if conditions else ""), args
+
+    def count_candidates(self, status: str | None = None, bucket: str | None = None,
+                         camera: str | None = None, unit: str | None = None) -> int:
+        where, args = self._candidate_filters(status, bucket, camera, unit)
         with self.connect() as con:
             return int(con.execute(f"SELECT COUNT(*) FROM candidate_shots c {where}", args).fetchone()[0])
 
     def list_candidates(self, status: str | None = None, limit: int = 100, offset: int = 0,
-                        bucket: str | None = None, camera: str | None = None) -> list[dict[str, Any]]:
-        conditions, args = (["c.status=?"], [status]) if status else ([], [])
-        bucket_condition, bucket_args = self._bucket_condition("c.candidate_unit", bucket)
-        if bucket_condition:
-            if bucket == "unassigned":
-                bucket_condition = "((c.candidate_bucket IS NULL OR c.candidate_bucket='') AND " + bucket_condition + ")"
-            else:
-                bucket_condition = "(c.candidate_bucket=? OR " + bucket_condition + ")"
-                bucket_args = [bucket] + bucket_args
-            conditions.append(bucket_condition)
-            args.extend(bucket_args)
-        camera_condition, camera_args = self._camera_condition(camera)
-        if camera_condition:
-            conditions.append(camera_condition)
-            args.extend(camera_args)
-        where = "WHERE " + " AND ".join(conditions) if conditions else ""
+                        bucket: str | None = None, camera: str | None = None,
+                        unit: str | None = None) -> list[dict[str, Any]]:
+        where, args = self._candidate_filters(status, bucket, camera, unit)
         with self.connect() as con:
             rows = con.execute(f"""SELECT c.*,s.title source_title,s.url source_url,
                                     (SELECT notes FROM reviews r WHERE r.candidate_id=c.id ORDER BY r.id DESC LIMIT 1) rejection_reason
@@ -646,18 +647,35 @@ class Database:
         decision = payload["decision"].upper()
         if decision not in {"ACCEPT", "REJECT", "RESTORE"}:
             raise ValueError("decision 必须是 ACCEPT、REJECT 或 RESTORE")
-        if decision == "ACCEPT" and payload.get("final_viewpoint") not in {"first_person", "third_person"}:
-            raise ValueError("请先选择第一人称或第三人称，再提交接受")
         new_status = {"ACCEPT": "ACCEPTED", "REJECT": "REJECTED", "RESTORE": "WAITING_REVIEW"}[decision]
         with self.connect() as con:
             cur = con.execute(
-                """INSERT INTO reviews(candidate_id,decision,final_bucket,final_unit,final_viewpoint,notes,manual_rule_overrides,reviewed_at)
-                   VALUES(?,?,?,?,?,?,?,?)""",
-                (candidate_id, decision, payload.get("final_bucket"), payload.get("final_unit"), payload.get("final_viewpoint"),
+                """INSERT INTO reviews(candidate_id,decision,final_bucket,final_unit,notes,manual_rule_overrides,reviewed_at)
+                   VALUES(?,?,?,?,?,?,?)""",
+                (candidate_id, decision, payload.get("final_bucket"), payload.get("final_unit"),
                  payload.get("notes", ""), json.dumps(payload.get("manual_rule_overrides", {}), ensure_ascii=False), now()))
-            con.execute("UPDATE candidate_shots SET status=?,candidate_bucket=COALESCE(?,candidate_bucket),candidate_unit=COALESCE(?,candidate_unit),candidate_viewpoint=COALESCE(?,candidate_viewpoint) WHERE id=?",
-                        (new_status, payload.get("final_bucket"), payload.get("final_unit"), payload.get("final_viewpoint"), candidate_id))
+            con.execute("""UPDATE candidate_shots
+                           SET status=?,candidate_bucket=COALESCE(?,candidate_bucket),candidate_unit=COALESCE(?,candidate_unit),
+                               delivery_description=COALESCE(?,delivery_description)
+                           WHERE id=?""",
+                        (new_status, payload.get("final_bucket"), payload.get("final_unit"),
+                         str(payload.get("delivery_description") or "").strip() or None, candidate_id))
             return int(cur.lastrowid)
+
+    def reject_waiting_by_source(self, source_id: int, notes: str) -> list[int]:
+        """Reject every WAITING_REVIEW candidate of one source; other states are untouched."""
+        stamp = now()
+        with self.connect() as con:
+            ids = [int(row["id"]) for row in con.execute(
+                "SELECT id FROM candidate_shots WHERE source_id=? AND status='WAITING_REVIEW' ORDER BY id",
+                (source_id,))]
+            con.executemany(
+                """INSERT INTO reviews(candidate_id,decision,notes,manual_rule_overrides,reviewed_at)
+                   VALUES(?,'REJECT',?,'{}',?)""", [(cid, notes, stamp) for cid in ids])
+            if ids:
+                placeholders = ",".join("?" for _ in ids)
+                con.execute(f"UPDATE candidate_shots SET status='REJECTED' WHERE id IN ({placeholders})", ids)
+            return ids
 
     def add_traffic(self, kind: str, byte_count: int, source_id: int | None = None, direction: str = "download") -> None:
         with self.connect() as con:
@@ -683,9 +701,9 @@ class Database:
 
     def quota_state(self) -> list[dict[str, Any]]:
         with self.connect() as con:
-            rows = con.execute("""SELECT candidate_bucket bucket,candidate_viewpoint viewpoint,duration_bucket,COUNT(*) count
+            rows = con.execute("""SELECT candidate_bucket bucket,duration_bucket,COUNT(*) count
                                   FROM candidate_shots WHERE status IN ('ACCEPTED','FINAL_DOWNLOADING','FINAL_READY','FINAL_QA','DELIVERABLE')
-                                  GROUP BY candidate_bucket,candidate_viewpoint,duration_bucket""").fetchall()
+                                  GROUP BY candidate_bucket,duration_bucket""").fetchall()
         return [dict(r) for r in rows]
 
     def create_final_clip(self, candidate_id: int, **fields: Any) -> int:
@@ -739,7 +757,8 @@ class Database:
     def delivery_filename_rows(self) -> list[dict[str, Any]]:
         with self.connect() as con:
             rows = con.execute("""SELECT f.candidate_id,f.final_path,f.delivery_unit,f.delivery_sequence,
-                                  f.delivery_filename,f.deliverable_status,c.candidate_unit unit,s.title source_title
+                                  f.delivery_filename,f.deliverable_status,c.candidate_unit unit,
+                                  c.candidate_bucket bucket,c.delivery_description,s.title source_title
                                   FROM final_clips f
                                   JOIN candidate_shots c ON c.id=f.candidate_id
                                   JOIN sources s ON s.id=c.source_id
@@ -766,12 +785,13 @@ class Database:
     def delivery_rows(self) -> list[dict[str, Any]]:
         with self.connect() as con:
             rows = con.execute("""SELECT c.id candidate_id,c.candidate_bucket bucket,c.candidate_unit unit,
-                c.candidate_viewpoint viewpoint,c.start_time,c.end_time,c.duration candidate_duration,c.duration_bucket,
+                c.start_time,c.end_time,c.duration candidate_duration,c.duration_bucket,
+                c.delivery_description,
                 s.url source_url,s.platform,s.video_id,s.title source_title,
                 f.final_path,f.delivery_unit,f.delivery_sequence,f.delivery_filename,
                 f.duration,f.width,f.height,f.fps,f.has_audio,f.qa_status,f.deliverable_status,
                 f.created_at,f.exported_at,
                 (SELECT notes FROM reviews r WHERE r.candidate_id=c.id ORDER BY r.id DESC LIMIT 1) notes
                 FROM final_clips f JOIN candidate_shots c ON c.id=f.candidate_id JOIN sources s ON s.id=c.source_id
-                WHERE f.qa_status='PASS' ORDER BY c.candidate_bucket,c.candidate_viewpoint,c.id""").fetchall()
+                WHERE f.qa_status='PASS' ORDER BY c.candidate_bucket,c.id""").fetchall()
             return [dict(r) for r in rows]

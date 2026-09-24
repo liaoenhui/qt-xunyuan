@@ -2,13 +2,12 @@
   "version": "4.0",
   "source_document": "QT寻源数据规则（供应商用）.pdf",
   "rule_statuses": ["PASS", "FAIL", "UNKNOWN", "NOT_APPLICABLE", "CONFLICT"],
-  "decision_order": ["redlines", "bucket", "unit", "unit_rules", "viewpoint", "duration_bucket", "specification", "clip", "submit"],
+  "decision_order": ["redlines", "bucket", "unit", "unit_rules", "duration_bucket", "specification", "clip", "submit"],
   "policy": {
     "automatic_reject_only_on_deterministic_hard_fail": true,
     "ai_has_final_veto": false,
     "human_final_review": true,
     "unit_quotas_are_advisory": true,
-    "bucket_viewpoint_quotas_are_hard": true,
     "duration_each_minimum_ratio": 0.20,
     "duration_recommended_ratio": {"short": 0.40, "medium": 0.35, "long": 0.25}
   },
